@@ -8,7 +8,7 @@ namespace TinyMUD
 		{
 			///
 			/// 加载DLL
-			System.Reflection.Assembly.LoadFrom("sample\\SimpleServer.dll");
+			System.Reflection.Assembly.LoadFrom("Sample\\SimpleServer.dll");
 			Type current = null;
 			foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
 			{
