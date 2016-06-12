@@ -16,6 +16,7 @@ namespace TinyMUD
 			public Action Action;
 			public abstract void Start();
 			public abstract void Stop();
+			public abstract bool IsRunning { get; }
 
 			protected Timer()
 			{
@@ -284,6 +285,11 @@ namespace TinyMUD
 					started = false;
 					loop.RemoveTimer(this);
 				}
+			}
+
+			public override bool IsRunning
+			{
+				get { return started; }
 			}
 
 			public int CompareTo(TimerImpl rhs)

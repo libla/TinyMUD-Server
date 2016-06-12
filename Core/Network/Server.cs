@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Net;
 using System.Net.Sockets;
 
@@ -26,6 +27,7 @@ namespace TinyMUD
 			public string ip { get; set; }
 			public int port { get; set; }
 			public int backlog { get; set; }
+			public int timeout { get; set; }
 			public int buffersize { get; set; }
 			public int sumsending { get; set; }
 			public Events events;
@@ -82,6 +84,7 @@ namespace TinyMUD
 				this.ip = null;
 				this.port = port;
 				this.backlog = 256;
+				this.timeout = Timeout.Infinite;
 				this.buffersize = 65536;
 				this.sumsending = 16;
 			}

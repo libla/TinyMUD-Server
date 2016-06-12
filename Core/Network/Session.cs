@@ -16,6 +16,7 @@ namespace TinyMUD
 		{
 			string ip { get; }
 			int port { get; }
+			int timeout { get; }
 			int buffersize { get; }
 			int sumsending { get; }
 			void request(Session session, Request request);
@@ -38,6 +39,7 @@ namespace TinyMUD
 		{
 			public string ip { get; set; }
 			public int port { get; set; }
+			public int timeout { get; set; }
 			public int buffersize { get; set; }
 			public int sumsending { get; set; }
 			public Events events;
@@ -78,6 +80,7 @@ namespace TinyMUD
 			{
 				this.ip = ip;
 				this.port = port;
+				this.timeout = Timeout.Infinite;
 				this.buffersize = 65536;
 				this.sumsending = 16;
 			}
@@ -96,6 +99,8 @@ namespace TinyMUD
 		protected readonly Loop _loop;
 		private readonly ISettings _settings;
 		private readonly Socket _socket;
+		private Loop.Timer _timer;
+		private long _alivetime;
 		private int _state;
 
 		private readonly ConcurrentQueue<ArraySegment<byte>> _sendqueue;
@@ -144,6 +149,8 @@ namespace TinyMUD
 			_loop = loop;
 			_settings = settings;
 			_socket = socket;
+			_timer = null;
+			_alivetime = Application.Now;
 			_state = (int)State.NONE;
 
 			_sendqueue = new ConcurrentQueue<ArraySegment<byte>>();
@@ -162,6 +169,23 @@ namespace TinyMUD
 				if ((_state & (int)State.CLOSE) != 0)
 					return;
 				_loop.Retain();
+				if (_settings.timeout != Timeout.Infinite)
+				{
+					_timer = Loop.Timer.Create(_settings.timeout, false, () =>
+					{
+						int dtime = (int)(Application.Now - _alivetime / 1000);
+						if (dtime >= _settings.timeout)
+						{
+							Close();
+						}
+						else
+						{
+							_timer.Time = _settings.timeout - dtime;
+							_timer.Start();
+						}
+					});
+					_timer.Start();
+				}
 				SocketAsyncEventArgs readargs = new SocketAsyncEventArgs();
 				readargs.SetBuffer(new byte[_settings.buffersize], 0, _settings.buffersize);
 				readargs.Completed += (sender, args) =>
@@ -282,6 +306,8 @@ namespace TinyMUD
 				_socket.Close();
 				AddAction();
 				_loop.Release();
+				if (_timer != null && _timer.IsRunning)
+					_timer.Stop();
 			}
 		}
 
@@ -364,6 +390,7 @@ namespace TinyMUD
 			}
 			else if (action.length != 0)
 			{
+				_alivetime = Application.Now;
 				if (action.length > 0)
 					_settings.read(this, action.length);
 				else
