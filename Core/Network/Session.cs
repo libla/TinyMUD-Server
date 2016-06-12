@@ -306,8 +306,6 @@ namespace TinyMUD
 				_socket.Close();
 				AddAction();
 				_loop.Release();
-				if (_timer != null && _timer.IsRunning)
-					_timer.Stop();
 			}
 		}
 
@@ -398,6 +396,8 @@ namespace TinyMUD
 			}
 			else
 			{
+				if (_timer != null && _timer.IsRunning)
+					_timer.Stop();
 				_settings.close(this);
 			}
 			action.session = null;
