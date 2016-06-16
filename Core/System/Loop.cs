@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 
 namespace TinyMUD
 {
@@ -59,6 +59,11 @@ namespace TinyMUD
 			}
 		}
 
+		public class Event
+		{
+			public string Message { get; internal set; }
+		}
+
 		public static Loop Current
 		{
 			get
@@ -79,6 +84,95 @@ namespace TinyMUD
 		private readonly List<Action> timerActions;
 		private readonly AutoResetEvent signal;
 		private readonly ConcurrentQueue<Action> actions;
+		private readonly Dictionary<string, Dictionary<Delegate, Action<Event>>> events;
+		private readonly List<Action<Event>> eventActions;
+		private readonly ConcurrentDictionary<EventAction, bool> eventsAsync;
+
+		private struct EventAction
+		{
+			public string Message;
+			public Delegate Action;
+			public Action<Event> Forward;
+
+			public static readonly EventActionCompare Comparer = new EventActionCompare();
+		}
+
+		private class EventActionCompare : IEqualityComparer<EventAction>
+		{
+			public bool Equals(EventAction a, EventAction b)
+			{
+				if (a.Action != b.Action)
+					return false;
+				return a.Message == b.Message;
+			}
+
+			public int GetHashCode(EventAction o)
+			{
+				return o.Action.GetHashCode();
+			}
+		}
+
+		private class HandleEvent
+		{
+			public Loop Loop;
+			public readonly Action Emit;
+			public Event Event;
+
+			public HandleEvent()
+			{
+				Emit = () =>
+				{
+					if (Loop.eventsAsync.Count > 0)
+					{
+						ICollection<EventAction> eventActions = Loop.eventsAsync.Keys;
+						foreach (var eventAction in eventActions)
+						{
+							bool flag;
+							if (Loop.eventsAsync.TryRemove(eventAction, out flag))
+							{
+								Dictionary<Delegate, Action<Event>> actions;
+								if (!Loop.events.TryGetValue(eventAction.Message, out actions))
+								{
+									actions = new Dictionary<Delegate, Action<Event>>();
+									Loop.events.Add(eventAction.Message, actions);
+								}
+								if (flag)
+								{
+									actions[eventAction.Action] = eventAction.Forward;
+								}
+								else
+								{
+									actions.Remove(eventAction.Action);
+								}
+							}
+						}
+					}
+					{
+						Dictionary<Delegate, Action<Event>> actions;
+						if (Loop.events.TryGetValue(Event.Message, out actions))
+						{
+							foreach (var action in actions)
+							{
+								Loop.eventActions.Add(action.Value);
+							}
+						}
+						for (int i = 0; i < Loop.eventActions.Count; ++i)
+						{
+							try
+							{
+								Loop.eventActions[i](Event);
+							}
+							catch (Exception e)
+							{
+								Log.Error(e);
+							}
+						}
+						Loop.eventActions.Clear();
+					}
+					Pool<HandleEvent>.Default.Release(this);
+				};
+			}
+		}
 
 		private Loop()
 		{
@@ -88,6 +182,9 @@ namespace TinyMUD
 			timerActions = new List<Action>();
 			signal = new AutoResetEvent(false);
 			actions = new ConcurrentQueue<Action>();
+			events = new Dictionary<string, Dictionary<Delegate, Action<Event>>>();
+			eventActions = new List<Action<Event>>();
+			eventsAsync = new ConcurrentDictionary<EventAction, bool>(EventAction.Comparer);
 		}
 
 		public bool IsCurrent
@@ -106,6 +203,67 @@ namespace TinyMUD
 				actions.Enqueue(action);
 				signal.Set();
 			}
+		}
+
+		public void Broadcast(string msg)
+		{
+			Broadcast(msg, new Event());
+		}
+
+		public void Broadcast(string msg, Event evt)
+		{
+			evt.Message = msg;
+			HandleEvent handle = Pool<HandleEvent>.Default.Acquire();
+			handle.Loop = this;
+			handle.Event = evt;
+			Execute(handle.Emit);
+		}
+
+		public void Link(string msg, Action action)
+		{
+			eventsAsync.AddOrUpdate(new EventAction
+			{
+				Message = msg, Action = action, Forward = evt =>
+				{
+					action();
+				}
+			}, true, (key, value) =>
+			{
+				return true;
+			});
+		}
+
+		public void Link<T>(string msg, Action<T> action) where T : Event
+		{
+			eventsAsync.AddOrUpdate(new EventAction
+			{
+				Message = msg, Action = action, Forward = evt =>
+				{
+					T e = evt as T;
+					if (e == null)
+						throw new InvalidCastException();
+					action(e);
+				}
+			}, true, (key, value) =>
+			{
+				return true;
+			});
+		}
+
+		public void Unlink(string msg, Action action)
+		{
+			eventsAsync.AddOrUpdate(new EventAction { Message = msg, Action = action }, false, (key, value) =>
+			{
+				return false;
+			});
+		}
+
+		public void Unlink<T>(string msg, Action<T> action) where T : Event
+		{
+			eventsAsync.AddOrUpdate(new EventAction { Message = msg, Action = action }, false, (key, value) =>
+			{
+				return false;
+			});
 		}
 
 		public void Retain()
