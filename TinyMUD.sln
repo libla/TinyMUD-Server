@@ -9,11 +9,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Core", "Core\Core.csproj", 
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Extension", "Extension", "{192D76F3-18D4-48D8-B4E0-2D2F13D93D4B}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Sample", "Sample", "{A1EFE0BF-2B17-4F9B-9CB4-C5FDD3EFD8C6}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Example", "Example", "{A1EFE0BF-2B17-4F9B-9CB4-C5FDD3EFD8C6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleServer", "Sample\SimpleServer\SimpleServer.csproj", "{D20B1AA3-426E-46F0-84E4-D0D8E96FCBD2}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleServer", "Example\SimpleServer\SimpleServer.csproj", "{D20B1AA3-426E-46F0-84E4-D0D8E96FCBD2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleClient", "Sample\SimpleClient\SimpleClient.csproj", "{498B0820-04AC-49F3-9C74-6404EA412EB1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleClient", "Example\SimpleClient\SimpleClient.csproj", "{498B0820-04AC-49F3-9C74-6404EA412EB1}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Log", "Extension\Log\Log.csproj", "{6AFF2DFB-A3D7-4207-8E72-53CE2587C6B3}"
 EndProject
