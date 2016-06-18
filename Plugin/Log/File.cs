@@ -2,9 +2,9 @@
 using System.IO;
 using System.Text;
 
-namespace TinyMUD.Logs
+namespace TinyMUD.Plugin
 {
-	public class DateFile : Log.Sink
+	public class FileLog : Log.Sink
 	{
 		private readonly string name;
 		private readonly Encoding encoding;
@@ -14,7 +14,7 @@ namespace TinyMUD.Logs
 		private int capacity;
 		private readonly byte[] newline;
 
-		public DateFile(string path, Encoding e)
+		public FileLog(string path, Encoding e)
 		{
 			name = path;
 			encoding = e;
@@ -23,9 +23,9 @@ namespace TinyMUD.Logs
 			capacity = 0;
 			newline = encoding.GetBytes("\n");
 		}
-		public DateFile(string path) : this(path, Encoding.UTF8) { }
+		public FileLog(string path) : this(path, Encoding.UTF8) { }
 
-		~DateFile()
+		~FileLog()
 		{
 			if (file != null)
 				file.Close();
