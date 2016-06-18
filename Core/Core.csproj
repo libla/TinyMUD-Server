@@ -48,6 +48,7 @@
     <Compile Include="System\Log.cs" />
     <Compile Include="System\Loop.cs" />
     <Compile Include="System\Pool.cs" />
+    <Compile Include="System\PriorityQueue.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Database\" />
