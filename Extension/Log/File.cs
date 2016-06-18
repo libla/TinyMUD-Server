@@ -2,7 +2,7 @@
 using System.IO;
 using System.Text;
 
-namespace TinyMUD.Plugin
+namespace TinyMUD.Extension
 {
 	public class FileLog : Log.Sink
 	{

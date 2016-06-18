@@ -7,7 +7,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Startup", "Startup\Startup.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Core", "Core\Core.csproj", "{42E9FB85-F3D7-470A-B028-2B517B0DD339}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Plugin", "Plugin", "{192D76F3-18D4-48D8-B4E0-2D2F13D93D4B}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Extension", "Extension", "{192D76F3-18D4-48D8-B4E0-2D2F13D93D4B}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Sample", "Sample", "{A1EFE0BF-2B17-4F9B-9CB4-C5FDD3EFD8C6}"
 EndProject
@@ -15,9 +15,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleServer", "Sample\Simp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleClient", "Sample\SimpleClient\SimpleClient.csproj", "{498B0820-04AC-49F3-9C74-6404EA412EB1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Log", "Plugin\Log\Log.csproj", "{6AFF2DFB-A3D7-4207-8E72-53CE2587C6B3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Log", "Extension\Log\Log.csproj", "{6AFF2DFB-A3D7-4207-8E72-53CE2587C6B3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DB", "Plugin\DB\DB.csproj", "{6AB713B4-46A2-4D05-A957-7790F8C4B68C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DB", "Extension\DB\DB.csproj", "{6AB713B4-46A2-4D05-A957-7790F8C4B68C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
