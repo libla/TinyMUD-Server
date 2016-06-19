@@ -11,9 +11,32 @@ namespace TinyMUD
 
 		public abstract class Timer
 		{
+			#region 自动转换Action类型
+			public struct Callback
+			{
+				public Action<Timer> Action
+				{
+					get { return action; }
+				}
+
+				private Action<Timer> action;
+
+				public static implicit operator Callback(Action action)
+				{
+					return new Callback { action = timer => action() };
+				}
+
+				public static implicit operator Callback(Action<Timer> action)
+				{
+					return new Callback { action = action };
+				}
+			}
+			#endregion
+
 			public int Time;
 			public bool Loop;
-			public Action Action;
+			public object Value;
+			public Callback Action;
 			public abstract void Start();
 			public abstract void Stop();
 			public abstract bool IsRunning { get; }
@@ -22,18 +45,6 @@ namespace TinyMUD
 			{
 				Time = 0;
 				Loop = false;
-			}
-
-			public static Timer operator + (Timer lhs, Action rhs)
-			{
-				lhs.Action += rhs;
-				return lhs;
-			}
-
-			public static Timer operator - (Timer lhs, Action rhs)
-			{
-				lhs.Action -= rhs;
-				return lhs;
 			}
 
 			public static Timer Create()
@@ -50,6 +61,15 @@ namespace TinyMUD
 			}
 
 			public static Timer Create(int time, bool loop, Action action)
+			{
+				Timer timer = Current.CreateTimer();
+				timer.Time = time;
+				timer.Loop = loop;
+				timer.Action = action;
+				return timer;
+			}
+
+			public static Timer Create(int time, bool loop, Action<Timer> action)
 			{
 				Timer timer = Current.CreateTimer();
 				timer.Time = time;
@@ -81,7 +101,8 @@ namespace TinyMUD
 		private readonly int threadId;
 		private int taskCount;
 		private readonly SortedSet<TimerImpl> timers;
-		private readonly List<Action> timerActions;
+		private readonly List<Timer> expireTimers;
+		private readonly List<Action<Timer>> expireTimerActions;
 		private readonly AutoResetEvent signal;
 		private readonly ConcurrentQueue<Action> actions;
 		private readonly Dictionary<string, Dictionary<Delegate, Action<Event>>> events;
@@ -179,7 +200,8 @@ namespace TinyMUD
 			threadId = Thread.CurrentThread.ManagedThreadId;
 			taskCount = 0;
 			timers = new SortedSet<TimerImpl>();
-			timerActions = new List<Action>();
+			expireTimers = new List<Timer>();
+			expireTimerActions = new List<Action<Timer>>();
 			signal = new AutoResetEvent(false);
 			actions = new ConcurrentQueue<Action>();
 			events = new Dictionary<string, Dictionary<Delegate, Action<Event>>>();
@@ -306,7 +328,11 @@ namespace TinyMUD
 						timeout = timer.elapsed;
 						break;
 					}
-					timerActions.Add(timer.Action);
+					if (timer.Action.Action != null)
+					{
+						expireTimers.Add(timer);
+						expireTimerActions.Add(timer.Action.Action);
+					}
 					timers.Remove(timer);
 					if (timer.Loop)
 					{
@@ -317,18 +343,19 @@ namespace TinyMUD
 						timer.started = false;
 					}
 				}
-				for (int i = 0, j = timerActions.Count; i < j; ++i)
+				for (int i = 0, j = expireTimerActions.Count; i < j; ++i)
 				{
 					try
 					{
-						timerActions[i]();
+						expireTimerActions[i](expireTimers[i]);
 					}
 					catch (Exception e)
 					{
 						Log.Error(e);
 					}
 				}
-				timerActions.Clear();
+				expireTimers.Clear();
+				expireTimerActions.Clear();
 				if (timeout == 0)
 				{
 					signal.WaitOne(Timeout.Infinite);
@@ -370,7 +397,11 @@ namespace TinyMUD
 					TimerImpl timer = timers.Min;
 					if (timer.elapsed > now)
 						break;
-					timerActions.Add(timer.Action);
+					if (timer.Action.Action != null)
+					{
+						expireTimers.Add(timer);
+						expireTimerActions.Add(timer.Action.Action);
+					}
 					timers.Remove(timer);
 					if (timer.Loop)
 					{
@@ -381,18 +412,19 @@ namespace TinyMUD
 						timer.started = false;
 					}
 				}
-				for (int i = 0, j = timerActions.Count; i < j; ++i)
+				for (int i = 0, j = expireTimerActions.Count; i < j; ++i)
 				{
 					try
 					{
-						timerActions[i]();
+						expireTimerActions[i](expireTimers[i]);
 					}
 					catch (Exception e)
 					{
 						Log.Error(e);
 					}
 				}
-				timerActions.Clear();
+				expireTimers.Clear();
+				expireTimerActions.Clear();
 			}
 		}
 
