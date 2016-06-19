@@ -38,6 +38,7 @@ namespace TinyMUD
 		private static readonly CancellationTokenSource cts = new CancellationTokenSource();
 		private static readonly List<KeyValuePair<Type, ModuleAttribute>> modules = new List<KeyValuePair<Type, ModuleAttribute>>();
 
+		public static Loop MainLoop { get; private set; }
 		public static long Now
 		{
 			get { return (long)((timeStartup + sinceStartup.Elapsed.TotalMilliseconds) * 1000); }
@@ -77,6 +78,7 @@ namespace TinyMUD
 			TimeSpan ts = DateTime.UtcNow - UTCTime;
 			timeStartup = ts.TotalMilliseconds;
 			Thread.CurrentThread.Name = "TinyMUD.Main";
+			MainLoop = Loop.Current;
 			Dictionary<Type, InitializeOnLoad> loadtypes = new Dictionary<Type, InitializeOnLoad>();
 			List<Type> loadlist = new List<Type>();
 			foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
