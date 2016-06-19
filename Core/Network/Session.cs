@@ -478,18 +478,22 @@ namespace TinyMUD
 		#region 处理发送消息
 		private void PostSend()
 		{
-			IList<ArraySegment<byte>> list = _sendargs.BufferList;
-			for (int i = list.Count; i < 2; ++i)
+			IList<ArraySegment<byte>> list;
+			while (true)
 			{
-				ArraySegment<byte> seg;
-				if (!_sendqueue.TryDequeue(out seg))
+				list = _sendargs.BufferList;
+				for (int i = list.Count; i < 2; ++i)
+				{
+					ArraySegment<byte> seg;
+					if (!_sendqueue.TryDequeue(out seg))
+						break;
+					list.Add(seg);
+				}
+				if (list.Count > 0)
 					break;
-				list.Add(seg);
-			}
-			if (list.Count == 0)
-			{
 				RemoveState(State.SEND);
-				return;
+				if (_sendqueue.Count == 0 || !AddState(State.SEND))
+					return;
 			}
 			try
 			{
