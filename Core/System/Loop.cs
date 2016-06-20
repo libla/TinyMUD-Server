@@ -9,7 +9,8 @@ namespace TinyMUD
 	{
 		private static readonly ThreadLocal<Loop> _current = new ThreadLocal<Loop>();
 
-		public abstract class Timer
+		#region 计时器
+		public sealed class Timer : ITimer
 		{
 			#region 自动转换Action类型
 			public struct Callback
@@ -33,51 +34,139 @@ namespace TinyMUD
 			}
 			#endregion
 
+			public override int GetHashCode()
+			{
+				return _index;
+			}
+
+			void ITimer.AddElapsed()
+			{
+				_elapsed += Time * 1000;
+			}
+
+			void ITimer.SetStop()
+			{
+				_loop = null;
+			}
+
+			private static int total = 0;
+			private static readonly ConcurrentStack<int> indexs = new ConcurrentStack<int>();
+			private readonly int _index;
+			private long _elapsed;
+			private Loop _loop;
+
 			public int Time;
 			public bool Loop;
 			public object Value;
 			public Callback Action;
-			public abstract void Start();
-			public abstract void Stop();
-			public abstract bool IsRunning { get; }
 
-			protected Timer()
+			public Timer()
 			{
 				Time = 0;
 				Loop = false;
+
+				_elapsed = -1;
+				_loop = null;
+				if (!indexs.TryPop(out _index))
+					_index = Interlocked.Increment(ref total);
 			}
 
-			public static Timer Create()
+			public Timer(int time, bool loop)
+				: this()
 			{
-				return Current.CreateTimer();
+				Time = time;
+				Loop = loop;
 			}
 
-			public static Timer Create(int time, bool loop)
+			public Timer(int time, bool loop, Action action)
+				: this()
 			{
-				Timer timer = Current.CreateTimer();
-				timer.Time = time;
-				timer.Loop = loop;
-				return timer;
+				Time = time;
+				Loop = loop;
+				Action = action;
 			}
 
-			public static Timer Create(int time, bool loop, Action action)
+			public Timer(int time, bool loop, Action<Timer> action)
+				: this()
 			{
-				Timer timer = Current.CreateTimer();
-				timer.Time = time;
-				timer.Loop = loop;
-				timer.Action = action;
-				return timer;
+				Time = time;
+				Loop = loop;
+				Action = action;
 			}
 
-			public static Timer Create(int time, bool loop, Action<Timer> action)
+			~Timer()
 			{
-				Timer timer = Current.CreateTimer();
-				timer.Time = time;
-				timer.Loop = loop;
-				timer.Action = action;
-				return timer;
+				indexs.Push(_index);
+			}
+
+			public void Start()
+			{
+				if (_loop != null)
+				{
+					if (!_loop.IsCurrent)
+						throw new InvalidOperationException();
+					return;
+				}
+				if (Time <= 0)
+					throw new ArgumentException();
+				_loop = Current;
+				_elapsed = Application.Now;
+				_loop.AddTimer(this);
+			}
+
+			public void Stop()
+			{
+				if (_loop == null)
+					return;
+				if (!_loop.IsCurrent)
+					throw new InvalidOperationException();
+				_loop.RemoveTimer(this);
+				_loop = null;
+			}
+
+			public bool IsRunning
+			{
+				get { return _loop != null; }
+			}
+
+			public long Elapsed
+			{
+				get { return _elapsed; }
 			}
 		}
+
+		private interface ITimer
+		{
+			void AddElapsed();
+			void SetStop();
+		}
+
+		private class TimerComparer : IComparer<Timer>
+		{
+			public int Compare(Timer x, Timer y)
+			{
+				long result = x.Elapsed - y.Elapsed;
+				if (result < 0)
+					return -1;
+				if (result > 0)
+					return 1;
+				return x.GetHashCode() - y.GetHashCode();
+			}
+
+			public static IComparer<Timer> Default = new TimerComparer();
+		}
+
+		private void AddTimer(Timer timer)
+		{
+			((ITimer)timer).AddElapsed();
+			timers.Add(timer);
+		}
+
+		private void RemoveTimer(Timer timer)
+		{
+			timers.Remove(timer);
+		}
+		#endregion
 
 		public class Event
 		{
@@ -100,7 +189,7 @@ namespace TinyMUD
 
 		private readonly int threadId;
 		private int taskCount;
-		private readonly SortedSet<TimerImpl> timers;
+		private readonly SortedSet<Timer> timers;
 		private readonly List<Timer> expireTimers;
 		private readonly List<Action<Timer>> expireTimerActions;
 		private readonly AutoResetEvent signal;
@@ -199,7 +288,7 @@ namespace TinyMUD
 		{
 			threadId = Thread.CurrentThread.ManagedThreadId;
 			taskCount = 0;
-			timers = new SortedSet<TimerImpl>();
+			timers = new SortedSet<Timer>(TimerComparer.Default);
 			expireTimers = new List<Timer>();
 			expireTimerActions = new List<Action<Timer>>();
 			signal = new AutoResetEvent(false);
@@ -322,10 +411,10 @@ namespace TinyMUD
 				long now = Application.Now;
 				while (timers.Count > 0)
 				{
-					TimerImpl timer = timers.Min;
-					if (timer.elapsed > now)
+					Timer timer = timers.Min;
+					if (timer.Elapsed > now)
 					{
-						timeout = timer.elapsed;
+						timeout = timer.Elapsed;
 						break;
 					}
 					if (timer.Action.Action != null)
@@ -340,7 +429,7 @@ namespace TinyMUD
 					}
 					else
 					{
-						timer.started = false;
+						((ITimer)timer).SetStop();
 					}
 				}
 				for (int i = 0, j = expireTimerActions.Count; i < j; ++i)
@@ -394,8 +483,8 @@ namespace TinyMUD
 				long now = Application.Now;
 				while (timers.Count > 0)
 				{
-					TimerImpl timer = timers.Min;
-					if (timer.elapsed > now)
+					Timer timer = timers.Min;
+					if (timer.Elapsed > now)
 						break;
 					if (timer.Action.Action != null)
 					{
@@ -409,7 +498,7 @@ namespace TinyMUD
 					}
 					else
 					{
-						timer.started = false;
+						((ITimer)timer).SetStop();
 					}
 				}
 				for (int i = 0, j = expireTimerActions.Count; i < j; ++i)
@@ -427,88 +516,5 @@ namespace TinyMUD
 				expireTimerActions.Clear();
 			}
 		}
-
-		#region 计时器
-		private class TimerImpl : Timer, IComparable<TimerImpl>
-		{
-			private static int total = 0;
-			private static readonly ConcurrentStack<int> indexs = new ConcurrentStack<int>();
-			private readonly int index;
-
-			public long elapsed;
-			public Loop loop;
-			public bool started;
-
-			public TimerImpl()
-			{
-				elapsed = -1;
-				started = false;
-				if (!indexs.TryPop(out index))
-					index = Interlocked.Increment(ref total);
-			}
-
-			~TimerImpl()
-			{
-				indexs.Push(index);
-			}
-
-			public override void Start()
-			{
-				if (!loop.IsCurrent)
-					throw new InvalidOperationException();
-				if (Time <= 0)
-					throw new ArgumentException();
-				if (!started)
-				{
-					started = true;
-					elapsed = Application.Now;
-					loop.AddTimer(this);
-				}
-			}
-
-			public override void Stop()
-			{
-				if (!loop.IsCurrent)
-					throw new InvalidOperationException();
-				if (started)
-				{
-					started = false;
-					loop.RemoveTimer(this);
-				}
-			}
-
-			public override bool IsRunning
-			{
-				get { return started; }
-			}
-
-			public int CompareTo(TimerImpl rhs)
-			{
-				if (elapsed == -1 || rhs.elapsed == -1)
-					throw new ArgumentException();
-				long result = elapsed - rhs.elapsed;
-				if (result < 0)
-					return -1;
-				if (result > 0)
-					return 1;
-				return index - rhs.index;
-			}
-		}
-		private Timer CreateTimer()
-		{
-			return new TimerImpl { loop = this };
-		}
-
-		private void AddTimer(TimerImpl timer)
-		{
-			timer.elapsed += timer.Time * 1000;
-			timers.Add(timer);
-		}
-
-		private void RemoveTimer(TimerImpl timer)
-		{
-			timers.Remove(timer);
-		}
-		#endregion
 	}
 }

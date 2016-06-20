@@ -171,7 +171,7 @@ namespace TinyMUD
 				_loop.Retain();
 				if (_settings.timeout != Timeout.Infinite)
 				{
-					_timer = Loop.Timer.Create(_settings.timeout, false, () =>
+					_timer = new Loop.Timer(_settings.timeout, false, () =>
 					{
 						int dtime = (int)(Application.Now - _alivetime / 1000);
 						if (dtime >= _settings.timeout)
