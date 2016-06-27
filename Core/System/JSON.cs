@@ -323,7 +323,7 @@ namespace TinyMUD
 				}
 				public override string ToString()
 				{
-					return b.ToString();
+					return b ? "true" : "false";
 				}
 				public override bool IsBool()
 				{
