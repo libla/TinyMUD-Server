@@ -1913,39 +1913,34 @@ namespace TinyMUD
 				return Write(handler, rootnode);
 			}
 
-			private bool Write(Handler stream, Node node)
+			private bool Write(Handler handler, Node node)
 			{
 				switch (node.TypeOf())
 				{
 				case Type.NULL:
-					stream.Null();
-					return true;
+					return handler.Null();
 				case Type.BOOLEAN:
-					stream.Bool((bool)node);
-					return true;
+					return handler.Bool((bool)node);
 				case Type.INT:
-					stream.Int((int)node);
-					return true;
+					return handler.Int((int)node);
 				case Type.DOUBLE:
-					stream.Double((double)node);
-					return true;
+					return handler.Double((double)node);
 				case Type.STRING:
-					stream.String((string)node);
-					return true;
+					return handler.String((string)node);
 				case Type.ARRAY:
 					{
 						if (writed.ContainsKey(node))
 							return false;
 						writed.Add(node, true);
 						List<Node> list = (List<Node>)node;
-						stream.StartArray();
+						if (!handler.StartArray())
+							return false;
 						for (int i = 0, j = list.Count; i < j; ++i)
 						{
-							if (!Write(stream, list[i]))
+							if (!Write(handler, list[i]))
 								return false;
 						}
-						stream.EndArray();
-						return true;
+						return handler.EndArray();
 					}
 				case Type.TABLE:
 					{
@@ -1953,15 +1948,16 @@ namespace TinyMUD
 							return false;
 						writed.Add(node, true);
 						Dictionary<string, Node> table = (Dictionary<string, Node>)node;
-						stream.StartTable();
+						if (!handler.StartTable())
+							return false;
 						foreach (KeyValuePair<string, Node> kv in table)
 						{
-							stream.Key(kv.Key);
-							if (!Write(stream, kv.Value))
+							if (!handler.Key(kv.Key))
+								return false;
+							if (!Write(handler, kv.Value))
 								return false;
 						}
-						stream.EndTable();
-						return true;
+						return handler.EndTable();
 					}
 				}
 				return false;
