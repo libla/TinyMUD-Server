@@ -21,6 +21,8 @@ namespace TinyMUD
 
 		public class Node
 		{
+			protected Node() { }
+
 			public virtual Type TypeOf()
 			{
 				return Type.NONE;
@@ -456,6 +458,10 @@ namespace TinyMUD
 				}
 				public override void Add(Node node)
 				{
+					if (node == empty)
+						throw new ArgumentException();
+					if (node == null)
+						node = NewNull();
 					list.Add(node);
 				}
 				public override Node this[int index]
@@ -468,7 +474,16 @@ namespace TinyMUD
 					}
 					set
 					{
-						list[index] = value;
+						if (value == null)
+						{
+							list[index] = NewNull();
+						}
+						else
+						{
+							if (value == empty)
+								throw new ArgumentException();
+							list[index] = value;
+						}
 					}
 				}
 			}
@@ -528,6 +543,8 @@ namespace TinyMUD
 						}
 						else
 						{
+							if (value == empty)
+								throw new ArgumentException();
 							table[key] = value;
 						}
 					}
@@ -535,7 +552,7 @@ namespace TinyMUD
 			}
 		}
 
-		#region 自定义解析事件接口
+		#region 自定义事件接口
 		public interface Handler
 		{
 			bool StartArray();
@@ -549,6 +566,7 @@ namespace TinyMUD
 			bool Double(double d);
 			bool Int(int i);
 		}
+
 		public interface Writer
 		{
 			bool Write(Handler handler);
