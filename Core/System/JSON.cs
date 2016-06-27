@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Text;
 using System.Globalization;
 using System.Collections.Generic;
@@ -535,7 +535,7 @@ namespace TinyMUD
 			}
 		}
 
-		#region ×Ô¶¨Òå½âÎöÊÂ¼ş½Ó¿Ú
+		#region è‡ªå®šä¹‰è§£æäº‹ä»¶æ¥å£
 		public interface Handler
 		{
 			bool StartArray();
@@ -555,7 +555,7 @@ namespace TinyMUD
 		}
 		#endregion
 
-		#region ĞòÁĞ»¯Ñ¡Ïî
+		#region åºåˆ—åŒ–é€‰é¡¹
 		public struct Options
 		{
 			public bool pretty;
@@ -563,7 +563,7 @@ namespace TinyMUD
 		}
 		#endregion
 
-		#region ´íÎóÏà¹Ø
+		#region é”™è¯¯ç›¸å…³
 		public enum Errors
 		{
 			NONE,
@@ -590,7 +590,7 @@ namespace TinyMUD
 		}
 		#endregion
 
-		#region ¼ÓËÙPowÔËËã
+		#region åŠ é€ŸPowè¿ç®—
 		private static readonly double[] e = { // 1e-0...1e308: 309 * 8 bytes = 2472 bytes
 			1e+0,  
 			1e+1,  1e+2,  1e+3,  1e+4,  1e+5,  1e+6,  1e+7,  1e+8,  1e+9,  1e+10, 1e+11, 1e+12, 1e+13, 1e+14, 1e+15, 1e+16, 1e+17, 1e+18, 1e+19, 1e+20, 1e+21, 1e+22, 1e+23, 1e+24, 1e+25, 1e+26, 1e+27, 1e+28, 
@@ -616,7 +616,7 @@ namespace TinyMUD
 		}
 		#endregion
 
-		#region ÄÚ²¿·ÖÀà¡¢×´Ì¬ºÍ×´Ì¬±í
+		#region å†…éƒ¨åˆ†ç±»ã€çŠ¶æ€å’ŒçŠ¶æ€è¡¨
 		private enum Tokens
 		{
 			SPACE = 0,	/* space */
@@ -894,7 +894,7 @@ namespace TinyMUD
 		};
 		#endregion
 
-		#region Ä¬ÈÏ½âÎö´¦Àí£¬Éú³ÉNode
+		#region é»˜è®¤è§£æå¤„ç†ï¼Œç”ŸæˆNode
 		private class NodeHandler : Stack<Node>, Handler
 		{
 			private string key;
@@ -1001,7 +1001,7 @@ namespace TinyMUD
 		}
 		#endregion
 
-		#region ÄÚ²¿Àà
+		#region å†…éƒ¨ç±»
 		private struct Context
 		{
 			public Handler handler;
@@ -1210,13 +1210,13 @@ namespace TinyMUD
 		}
 		#endregion
 		
-		#region ÄÚ²¿±äÁ¿
+		#region å†…éƒ¨å˜é‡
 		private Context context;
 		private Buffer normalwriter;
 		private Buffer prettywriter;
 		#endregion
 
-		#region ÄÚ²¿½âÎöÊµÏÖ
+		#region å†…éƒ¨è§£æå®ç°
 		private bool ParseWord(Words word)
 		{
 			WordStates state = WordStates.__;
@@ -1844,7 +1844,7 @@ namespace TinyMUD
 		}
 		#endregion
 
-		#region ¶ÔÍâ½âÎö½Ó¿Ú
+		#region å¯¹å¤–è§£ææ¥å£
 		public Node Parse(string input)
 		{
 			return Parse(Encoding.UTF8.GetBytes(input));
@@ -1896,7 +1896,7 @@ namespace TinyMUD
 		}
 		#endregion
 
-		#region Ä¬ÈÏĞòÁĞ»¯ÊµÏÖ£¬ĞòÁĞ»¯Node
+		#region é»˜è®¤åºåˆ—åŒ–å®ç°ï¼Œåºåˆ—åŒ–Node
 		private class NodeWriter : Writer
 		{
 			private readonly Node rootnode;
@@ -1969,7 +1969,7 @@ namespace TinyMUD
 		}
 		#endregion
 
-		#region ¶ÔÍâĞòÁĞ»¯½Ó¿Ú
+		#region å¯¹å¤–åºåˆ—åŒ–æ¥å£
 
 		public string String(Writer writer, Options options)
 		{
