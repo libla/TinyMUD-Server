@@ -48,6 +48,9 @@ namespace TinyMUD.Extension
 				date = now;
 				try
 				{
+					string path = Path.GetDirectoryName(name);
+					if (!string.IsNullOrEmpty(path) && !Directory.Exists(path))
+						Directory.CreateDirectory(path);
 					file = new FileStream(string.Format("{0}_{1}.log", name, date), FileMode.Append, FileAccess.Write, FileShare.Read);
 				}
 				catch (IOException)
