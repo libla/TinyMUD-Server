@@ -45,7 +45,6 @@
     <Compile Include="System\Application.cs" />
     <Compile Include="System\Buffer.cs" />
     <Compile Include="System\Console.cs" />
-    <Compile Include="System\JSON.cs" />
     <Compile Include="System\Log.cs" />
     <Compile Include="System\Loop.cs" />
     <Compile Include="System\Pool.cs" />
