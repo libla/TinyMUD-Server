@@ -2,7 +2,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Security;
 using System.Text;
 using System.Xml;
 
@@ -132,19 +131,26 @@ namespace TinyMUD
 
 		public static Config Load(string input)
 		{
-			return LoadImpl(Encoding.UTF8.GetBytes(input), 0);
+			return Load(Encoding.UTF8.GetBytes(input));
 		}
 
 		public static Config Load(byte[] input)
 		{
-			if (input.Length >= 3 && input[0] == 0xEF && input[1] == 0xBB && input[2] == 0xBF)
-				return LoadImpl(input, 3);
-			return LoadImpl(input, 0);
+			return Load(input, 0, input.Length);
 		}
 
-		private static Config LoadImpl(byte[] input, int start)
+		public static Config Load(byte[] input, int start)
 		{
-			MemoryStream stream = new MemoryStream(input, start, input.Length - start);
+			return Load(input, start, input.Length - start);
+		}
+
+		public static Config Load(byte[] input, int start, int count)
+		{
+			return LoadXML(new MemoryStream(input, start, count, false));
+		}
+
+		private static Config LoadXML(Stream stream)
+		{
 			XmlDocument xml = new XmlDocument();
 			try
 			{
@@ -165,20 +171,30 @@ namespace TinyMUD
 			return root;
 		}
 
+		private static void AddNode(TableNode parent, string name, Config node)
+		{
+			Config config;
+			if (parent.dict.TryGetValue(name, out config))
+			{
+				ArrayNode array = config as ArrayNode;
+				if (array == null)
+				{
+					array = new ArrayNode();
+					array.list.Add(config);
+					parent.dict[name] = array;
+				}
+				array.list.Add(node);
+			}
+			else
+			{
+				parent.dict[name] = node;
+			}
+		}
+
 		private static void AddNode(TableNode parent, XmlNode node)
 		{
-			string name = node.Name;
-			Config config;
-			if (!parent.dict.TryGetValue(name, out config))
-			{
-				config = new ArrayNode();
-				parent.dict.Add(name, config);
-			}
-			ArrayNode array = config as ArrayNode;
-			if (array == null)
-				throw new Exception(0, 0);
 			TableNode table = new TableNode();
-			array.list.Add(table);
+			AddNode(parent, node.Name, table);
 			var attrs = node.Attributes;
 			for (int i = 0; i < attrs.Count; i++)
 			{
