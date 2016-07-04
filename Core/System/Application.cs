@@ -36,7 +36,7 @@ namespace TinyMUD
 		private static readonly Stopwatch sinceStartup = new Stopwatch();
 		private static double timeStartup;
 		private static readonly CancellationTokenSource cts = new CancellationTokenSource();
-		private static readonly List<KeyValuePair<Type, ModuleAttribute>> modules = new List<KeyValuePair<Type, ModuleAttribute>>();
+		private static readonly List<Action> unloads = new List<Action>();
 
 		public static Loop MainLoop { get; private set; }
 		public static long Now
@@ -81,6 +81,7 @@ namespace TinyMUD
 			MainLoop = Loop.Current;
 			Dictionary<Type, InitializeOnLoad> loadtypes = new Dictionary<Type, InitializeOnLoad>();
 			List<Type> loadlist = new List<Type>();
+			List<Action> loads = new List<Action>();
 			foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
 			{
 				foreach (Type type in assembly.GetTypes())
@@ -91,7 +92,30 @@ namespace TinyMUD
 						ModuleAttribute attr = attrs[i] as ModuleAttribute;
 						if (attr != null)
 						{
-							modules.Add(new KeyValuePair<Type, ModuleAttribute>(type, attr));
+							try
+							{
+								Action load = Delegate.CreateDelegate(typeof(Action), type, attr.load) as Action;
+								if (load != null)
+									loads.Add(load);
+							}
+							catch (MissingMethodException)
+							{
+							}
+							catch (MethodAccessException)
+							{
+							}
+							try
+							{
+								Action unload = Delegate.CreateDelegate(typeof(Action), type, attr.unload) as Action;
+								if (unload != null)
+									unloads.Add(unload);
+							}
+							catch (MissingMethodException)
+							{
+							}
+							catch (MethodAccessException)
+							{
+							}
 							break;
 						}
 					}
@@ -122,25 +146,17 @@ namespace TinyMUD
 			{
 				RuntimeHelpers.RunClassConstructor(loadorders[i].TypeHandle);
 			}
-			for (int i = 0; i < modules.Count; ++i)
+			for (int i = 0; i < loads.Count; ++i)
 			{
-				Type type = modules[i].Key;
-				ModuleAttribute module = modules[i].Value;
-				Action load = Delegate.CreateDelegate(typeof(Action), type, module.load) as Action;
-				if (load != null)
-					load();
+				loads[i]();
 			}
 		}
 
 		public static void Exit()
 		{
-			for (int i = modules.Count - 1; i >= 0; --i)
+			for (int i = unloads.Count - 1; i >= 0; --i)
 			{
-				Type type = modules[i].Key;
-				ModuleAttribute module = modules[i].Value;
-				Action unload = Delegate.CreateDelegate(typeof(Action), type, module.unload) as Action;
-				if (unload != null)
-					unload();
+				unloads[i]();
 			}
 			cts.Cancel();
 		}
