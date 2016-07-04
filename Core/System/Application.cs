@@ -20,13 +20,13 @@ namespace TinyMUD
 	[AttributeUsage(AttributeTargets.Class)]
 	public class ModuleAttribute : Attribute
 	{
-		public readonly string load;
-		public readonly string unload;
-		public ModuleAttribute() : this("Load", "Unload") { }
-		public ModuleAttribute(string load, string unload)
+		public readonly string Load;
+		public readonly string Unload;
+
+		public ModuleAttribute()
 		{
-			this.load = load;
-			this.unload = unload;
+			Load = null;
+			Unload = null;
 		}
 	}
 
@@ -92,29 +92,49 @@ namespace TinyMUD
 						ModuleAttribute attr = attrs[i] as ModuleAttribute;
 						if (attr != null)
 						{
-							try
+							if (attr.Load == null)
 							{
-								Action load = Delegate.CreateDelegate(typeof(Action), type, attr.load) as Action;
-								if (load != null)
-									loads.Add(load);
+								try
+								{
+									Action load = Delegate.CreateDelegate(typeof(Action), type, "Load") as Action;
+									if (load != null)
+										loads.Add(load);
+								}
+								catch (MissingMethodException)
+								{
+								}
+								catch (MethodAccessException)
+								{
+								}
 							}
-							catch (MissingMethodException)
+							else
 							{
+								Action load = Delegate.CreateDelegate(typeof(Action), type, attr.Load) as Action;
+								if (load == null)
+									throw new MissingMethodException(type.FullName, attr.Load);
+								loads.Add(load);
 							}
-							catch (MethodAccessException)
+							if (attr.Unload == null)
 							{
+								try
+								{
+									Action unload = Delegate.CreateDelegate(typeof(Action), type, "Unload") as Action;
+									if (unload != null)
+										unloads.Add(unload);
+								}
+								catch (MissingMethodException)
+								{
+								}
+								catch (MethodAccessException)
+								{
+								}
 							}
-							try
+							else
 							{
-								Action unload = Delegate.CreateDelegate(typeof(Action), type, attr.unload) as Action;
-								if (unload != null)
-									unloads.Add(unload);
-							}
-							catch (MissingMethodException)
-							{
-							}
-							catch (MethodAccessException)
-							{
+								Action unload = Delegate.CreateDelegate(typeof(Action), type, attr.Unload) as Action;
+								if (unload == null)
+									throw new MissingMethodException(type.FullName, attr.Unload);
+								unloads.Add(unload);
 							}
 							break;
 						}
