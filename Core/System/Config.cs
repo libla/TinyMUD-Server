@@ -160,8 +160,12 @@ namespace TinyMUD
 			{
 				throw new Exception(e.LineNumber, e.LinePosition);
 			}
-			XmlNode rootnode = xml.LastChild;
-			if (rootnode.Name != "Config")
+			XmlNode rootnode = xml.FirstChild;
+			while (rootnode.NodeType != XmlNodeType.Element)
+				rootnode = rootnode.NextSibling;
+			string rootname = rootnode.Name;
+			if (rootname != "Config" && rootname != "config" &&
+				rootname != "Root" && rootname != "root")
 				return null;
 			TableNode root = new TableNode();
 			for (XmlNode child = rootnode.FirstChild; child != null; child = child.NextSibling)
@@ -203,7 +207,8 @@ namespace TinyMUD
 			}
 			for (XmlNode child = node.FirstChild; child != null; child = child.NextSibling)
 			{
-				AddNode(table, child);
+				if (child.NodeType == XmlNodeType.Element)
+					AddNode(table, child);
 			}
 		}
 
