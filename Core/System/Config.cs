@@ -208,18 +208,31 @@ namespace TinyMUD
 
 		private static void AddNode(TableNode parent, XmlNode node)
 		{
-			TableNode table = new TableNode();
-			AddNode(parent, node.Name, table);
-			var attrs = node.Attributes;
-			for (int i = 0; i < attrs.Count; i++)
+			string name = node.Name;
+			if (name == "Value" || name == "value")
 			{
-				var attr = attrs[i];
-				table.dict[attr.Name] = new ValueNode(attr.Value);
+				var attrs = node.Attributes;
+				for (int i = 0; i < attrs.Count; i++)
+				{
+					var attr = attrs[i];
+					AddNode(parent, attr.Name, new ValueNode(attr.Value));
+				}
 			}
-			for (XmlNode child = node.FirstChild; child != null; child = child.NextSibling)
+			else
 			{
-				if (child.NodeType == XmlNodeType.Element)
-					AddNode(table, child);
+				TableNode table = new TableNode();
+				AddNode(parent, name, table);
+				var attrs = node.Attributes;
+				for (int i = 0; i < attrs.Count; i++)
+				{
+					var attr = attrs[i];
+					table.dict[attr.Name] = new ValueNode(attr.Value);
+				}
+				for (XmlNode child = node.FirstChild; child != null; child = child.NextSibling)
+				{
+					if (child.NodeType == XmlNodeType.Element)
+						AddNode(table, child);
+				}
 			}
 		}
 
