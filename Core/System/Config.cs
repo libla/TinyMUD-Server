@@ -92,6 +92,16 @@ namespace TinyMUD
 			}
 		}
 
+		public virtual Config Select(params string[] keys)
+		{
+			return Null;
+		}
+
+		public virtual Config Select(int lower, int upper)
+		{
+			return Null;
+		}
+
 		public virtual IEnumerable<string> Keys
 		{
 			get { return EmptyKeys; }
@@ -170,7 +180,8 @@ namespace TinyMUD
 			TableNode root = new TableNode();
 			for (XmlNode child = rootnode.FirstChild; child != null; child = child.NextSibling)
 			{
-				AddNode(root, child);
+				if (child.NodeType == XmlNodeType.Element)
+					AddNode(root, child);
 			}
 			return root;
 		}
@@ -293,6 +304,21 @@ namespace TinyMUD
 				get { return list.Count == 0 ? base[key] : list[0][key]; }
 			}
 
+			public override Config Select(params string[] keys)
+			{
+				return list.Count == 0 ? base.Select(keys) : list[0].Select(keys);
+			}
+
+			public override Config Select(int lower, int upper)
+			{
+				ArrayNode node = new ArrayNode();
+				for (int i = lower, j = Math.Min(upper, list.Count); i < j; ++i)
+				{
+					node.list.Add(list[i]);
+				}
+				return node;
+			}
+
 			public override IEnumerable<Config> Values
 			{
 				get { return list.ToArray(); }
@@ -334,6 +360,19 @@ namespace TinyMUD
 					Config value;
 					return dict.TryGetValue(key, out value) ? value : base[key];
 				}
+			}
+
+			public override Config Select(params string[] keys)
+			{
+				TableNode node = new TableNode();
+				for (int i = 0; i < keys.Length; ++i)
+				{
+					string key = keys[i];
+					Config value;
+					if (dict.TryGetValue(key, out value))
+						node.dict[key] = value;
+				}
+				return node;
 			}
 
 			public override IEnumerable<string> Keys
