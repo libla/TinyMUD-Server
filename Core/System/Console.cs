@@ -2,6 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 
 namespace TinyMUD
 {
@@ -10,13 +11,12 @@ namespace TinyMUD
 	{
 		private static bool inputing = false;
 		private static readonly BlockingCollection<string> list = new BlockingCollection<string>(new ConcurrentQueue<string>());
-		private static readonly Loop loop;
 
-		public static event Action<string> OnInput;
+		private static readonly WeakTable<Loop, Action<string>> actions = new WeakTable<Loop, Action<string>>();
+		private static readonly List<KeyValuePair<Loop, Action<string>>> actionstmp = new List<KeyValuePair<Loop, Action<string>>>();
 
 		static Console()
 		{
-			loop = Loop.Current;
 			object signal = new object();
 			object locker = new object();
 			System.Console.CancelKeyPress += (sender, args) =>
@@ -57,10 +57,20 @@ namespace TinyMUD
 					Monitor.Pulse(locker);
 					Monitor.Exit(locker);
 					string result = task.Result;
-					loop.Execute(() =>
+					lock (actions)
 					{
-						OnInput(result);
-					});
+						foreach (var kv in actions)
+							actionstmp.Add(kv);
+					}
+					for (int i = 0; i < actionstmp.Count; ++i)
+					{
+						Action<string> action = actionstmp[i].Value;
+						actionstmp[i].Key.Execute(() =>
+						{
+							action(result);
+						});
+					}
+					actionstmp.Clear();
 				}
 			}).Start();
 			new Thread(() =>
@@ -92,6 +102,24 @@ namespace TinyMUD
 		public static void WriteLine(string text)
 		{
 			list.Add(text);
+		}
+
+		public static void OnInput(Loop loop, Action<string> action)
+		{
+			lock (actions)
+			{
+				Action<string> value;
+				if (actions.TryGetValue(loop, out value))
+					value += action;
+				else
+					value = action;
+				actions[loop] = value;
+			}
+		}
+
+		public static void OnInput(Action<string> action)
+		{
+			OnInput(Loop.Current, action);
 		}
 	}
 }

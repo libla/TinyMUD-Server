@@ -19,12 +19,12 @@ namespace TinyMUD
 			}
 			s = task.Result;
 			UTF8StringRequest request = new UTF8StringRequest();
-			Console.OnInput += (text) =>
+			Console.OnInput(text =>
 			{
 				request.Value = text;
 				request.Send(s);
 				s.Flush();
-			};
+			});
 		}
 
 		public static void Unload()
