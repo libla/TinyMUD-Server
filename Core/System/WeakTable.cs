@@ -1,139 +1,106 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 
 namespace System.Collections.Generic
 {
-	internal struct WeakKey<T> where T : class
-	{
-		public WeakReference<T> Key;
-		public int Hash;
-
-		public static implicit operator WeakKey<T>(T key)
-		{
-			if (key == null)
-				throw new ArgumentNullException("key");
-			return new WeakKey<T> { Key = new WeakReference<T>(key), Hash = key.GetHashCode() };
-		}
-
-		private class EqualityComparer : IEqualityComparer<WeakKey<T>>
-		{
-			public bool Equals(WeakKey<T> x, WeakKey<T> y)
-			{
-				if (x.Hash != y.Hash)
-					return false;
-				T k1, k2;
-				bool r1 = x.Key.TryGetTarget(out k1);
-				bool r2 = y.Key.TryGetTarget(out k2);
-				if (r1 != r2)
-					return true;
-				return !r1 || k1.Equals(k2);
-			}
-
-			public int GetHashCode(WeakKey<T> obj)
-			{
-				return obj.Hash;
-			}
-		}
-
-		public static readonly IEqualityComparer<WeakKey<T>> DefaultEqualityComparer = new EqualityComparer();
-	}
-
 	public sealed class WeakTable<TKey, TValue> : IEnumerable<KeyValuePair<TKey, TValue>>, IEnumerable where TKey : class
 	{
-		private readonly Dictionary<WeakKey<TKey>, TValue> dict;
-		private readonly List<WeakKey<TKey>> cleans;
-		private int step;
-		private int maxstep;
+		private readonly ConditionalWeakTable<TKey, WeakNode> table;
+		private readonly LinkedList<KeyValue> list;
+		private readonly ConcurrentStack<LinkedListNode<KeyValue>> deletes;
+		private readonly ConditionalWeakTable<TKey, WeakNode>.CreateValueCallback create;
 
 		public WeakTable()
 		{
-			dict = new Dictionary<WeakKey<TKey>, TValue>(WeakKey<TKey>.DefaultEqualityComparer);
-			cleans = new List<WeakKey<TKey>>();
-			step = 0;
-			maxstep = 64;
-		}
-
-		public WeakTable(int capacity)
-		{
-			dict = new Dictionary<WeakKey<TKey>, TValue>(capacity, WeakKey<TKey>.DefaultEqualityComparer);
-			cleans = new List<WeakKey<TKey>>();
-			step = 0;
-			maxstep = 64;
-		}
-
-		public WeakTable(IDictionary<TKey, TValue> dictionary)
-			: this(dictionary.Count)
-		{
-			foreach (KeyValuePair<TKey, TValue> kv in dictionary)
+			table = new ConditionalWeakTable<TKey, WeakNode>();
+			list = new LinkedList<KeyValue>();
+			deletes = new ConcurrentStack<LinkedListNode<KeyValue>>();
+			create = key =>
 			{
-				Add(kv.Key, kv.Value);
-			}
-		}
-
-		public Enumerator GetEnumerator()
-		{
-			onestep();
-			return new Enumerator(dict.GetEnumerator());
+				LinkedListNode<KeyValue> node = list.AddLast(new KeyValue { Key = new WeakReference<TKey>(key) });
+				return new WeakNode(node, this);
+			};
 		}
 
 		public TValue this[TKey key]
 		{
 			get
 			{
-				onestep();
-				return dict[key];
+				clean();
+				WeakNode node;
+				if (!table.TryGetValue(key, out node))
+					throw new KeyNotFoundException();
+				return node.node.Value.Value;
 			}
 			set
 			{
-				onestep();
-				dict[key] = value;
+				clean();
+				WeakNode node = table.GetValue(key, create);
+				KeyValue kv = node.node.Value;
+				kv.Value = value;
+				node.node.Value = kv;
 			}
 		}
 
 		public void Add(TKey key, TValue value)
 		{
-			onestep();
-			dict.Add(key, value);
+			WeakNode node = new WeakNode(null, this);
+			table.Add(key, node);
+			node.node = list.AddLast(new KeyValue {Key = new WeakReference<TKey>(key), Value = value});
 		}
 
 		public bool Remove(TKey key)
 		{
-			return dict.Remove(key);
-		}
-
-		public bool TryGetValue(TKey key, out TValue value)
-		{
-			onestep();
-			return dict.TryGetValue(key, out value);
+			WeakNode node;
+			if (!table.TryGetValue(key, out node))
+				return false;
+			list.Remove(node.node);
+			return true;
 		}
 
 		public void Clear()
 		{
-			step = 0;
-			dict.Clear();
+			foreach (KeyValue kv in list)
+			{
+				TKey key;
+				if (kv.Key.TryGetTarget(out key))
+					table.Remove(key);
+			}
+			list.Clear();
+			deletes.Clear();
 		}
 
-		private void onestep()
+		public bool TryGetValue(TKey key, out TValue value)
 		{
-			if (++step >= maxstep)
+			clean();
+			WeakNode node;
+			if (!table.TryGetValue(key, out node))
 			{
-				step = 0;
-				foreach (KeyValuePair<WeakKey<TKey>, TValue> kv in dict)
+				value = default(TValue);
+				return false;
+			}
+			value = node.node.Value.Value;
+			return true;
+		}
+
+		public Enumerator GetEnumerator()
+		{
+			clean();
+			return new Enumerator(list.GetEnumerator());
+		}
+
+		private void clean()
+		{
+			LinkedListNode<KeyValue> node;
+			while (deletes.TryPop(out node))
+			{
+				try
 				{
-					TKey key;
-					if (!kv.Key.Key.TryGetTarget(out key))
-					{
-						cleans.Add(kv.Key);
-					}
+					list.Remove(node);
 				}
-				for (int i = 0; i < cleans.Count; ++i)
+				catch (InvalidOperationException)
 				{
-					dict.Remove(cleans[i]);
 				}
-				if (cleans.Count >= maxstep >> 1)
-				{
-					maxstep <<= 1;
-				}
-				cleans.Clear();
 			}
 		}
 
@@ -147,12 +114,35 @@ namespace System.Collections.Generic
 			return GetEnumerator();
 		}
 
+		internal struct KeyValue
+		{
+			public WeakReference<TKey> Key;
+			public TValue Value;
+		}
+
+		private class WeakNode
+		{
+			public LinkedListNode<KeyValue> node;
+			private readonly WeakTable<TKey, TValue> table;
+
+			public WeakNode(LinkedListNode<KeyValue> node, WeakTable<TKey, TValue> table)
+			{
+				this.node = node;
+				this.table = table;
+			}
+
+			~WeakNode()
+			{
+				table.deletes.Push(node);
+			}
+		}
+
 		public struct Enumerator : IEnumerator<KeyValuePair<TKey, TValue>>, IDisposable, IDictionaryEnumerator, IEnumerator
 		{
-			private Dictionary<WeakKey<TKey>, TValue>.Enumerator enumerator;
+			private LinkedList<KeyValue>.Enumerator enumerator;
 			private KeyValuePair<TKey, TValue> current;
 
-			internal Enumerator(Dictionary<WeakKey<TKey>, TValue>.Enumerator enumerator)
+			internal Enumerator(LinkedList<KeyValue>.Enumerator enumerator)
 			{
 				this.enumerator = enumerator;
 				this.current = default(KeyValuePair<TKey, TValue>);
@@ -174,8 +164,8 @@ namespace System.Collections.Generic
 				while (enumerator.MoveNext())
 				{
 					TKey key;
-					KeyValuePair<WeakKey<TKey>, TValue> kv = enumerator.Current;
-					if (kv.Key.Key.TryGetTarget(out key))
+					KeyValue kv = enumerator.Current;
+					if (kv.Key.TryGetTarget(out key))
 					{
 						current = new KeyValuePair<TKey, TValue>(key, kv.Value);
 						return true;
