@@ -114,6 +114,7 @@ namespace System.Collections.Generic
 			return GetEnumerator();
 		}
 
+		#region 内部类
 		internal struct KeyValue
 		{
 			public WeakReference<TKey> Key;
@@ -136,7 +137,9 @@ namespace System.Collections.Generic
 				table.deletes.Push(node);
 			}
 		}
+		#endregion
 
+		#region 迭代器
 		public struct Enumerator : IEnumerator<KeyValuePair<TKey, TValue>>, IDisposable, IDictionaryEnumerator, IEnumerator
 		{
 			private LinkedList<KeyValue>.Enumerator enumerator;
@@ -200,5 +203,6 @@ namespace System.Collections.Generic
 				get { return new DictionaryEntry(current.Key, current.Value); }
 			}
 		}
+		#endregion
 	}
 }
