@@ -51,6 +51,7 @@
     <Compile Include="System\Loop.cs" />
     <Compile Include="System\Pool.cs" />
     <Compile Include="System\PriorityQueue.cs" />
+    <Compile Include="System\WeakTable.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Database\" />
