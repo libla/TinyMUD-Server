@@ -142,16 +142,6 @@ namespace TinyMUD
 			}
 		}
 
-		public virtual Config Select(params string[] keys)
-		{
-			return Null;
-		}
-
-		public virtual Config Select(int lower, int upper)
-		{
-			return Null;
-		}
-
 		public virtual IEnumerable<string> Keys
 		{
 			get { return EmptyKeys; }
@@ -192,46 +182,6 @@ namespace TinyMUD
 			if (!node.IsString())
 				throw new InvalidCastException();
 			return node.Value;
-		}
-
-		public static Config Combine(params Config[] configs)
-		{
-			ArrayNode array = new ArrayNode();
-			List<Config> tables = new List<Config>();
-			for (int i = 0; i < configs.Length; ++i)
-			{
-				if (configs[i].IsTable())
-				{
-					tables.Add(configs[i]);
-				}
-				else if (configs[i].IsArray())
-				{
-					foreach (Config config in configs[i])
-						array.list.Add(config);
-				}
-				else
-				{
-					array.list.Add(configs[i]);
-				}
-			}
-			TableNode table = null;
-			if (tables.Count > 0)
-			{
-				table = new TableNode();
-				for (int i = 0; i < tables.Count; ++i)
-				{
-					Config config = tables[i];
-					foreach (string key in config.Keys)
-					{
-						AddNode(table, key, config[key]);
-					}
-				}
-			}
-			if (table != null)
-				array.list.Add(table);
-			if (array.list.Count > 1)
-				return array;
-			return array[0];
 		}
 
 		public static Config Load(string input)
@@ -412,21 +362,6 @@ namespace TinyMUD
 				get { return list.Count == 0 ? base[key] : list[0][key]; }
 			}
 
-			public override Config Select(params string[] keys)
-			{
-				return list.Count == 0 ? base.Select(keys) : list[0].Select(keys);
-			}
-
-			public override Config Select(int lower, int upper)
-			{
-				ArrayNode node = new ArrayNode();
-				for (int i = lower, j = Math.Min(upper, list.Count); i < j; ++i)
-				{
-					node.list.Add(list[i]);
-				}
-				return node;
-			}
-
 			public override IEnumerable<Config> Values
 			{
 				get { return list.ToArray(); }
@@ -468,19 +403,6 @@ namespace TinyMUD
 					Config value;
 					return dict.TryGetValue(key, out value) ? value : base[key];
 				}
-			}
-
-			public override Config Select(params string[] keys)
-			{
-				TableNode node = new TableNode();
-				for (int i = 0; i < keys.Length; ++i)
-				{
-					string key = keys[i];
-					Config value;
-					if (dict.TryGetValue(key, out value))
-						node.dict[key] = value;
-				}
-				return node;
 			}
 
 			public override IEnumerable<string> Keys
