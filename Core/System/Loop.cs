@@ -387,6 +387,7 @@ namespace TinyMUD
 		public void Release()
 		{
 			Interlocked.Decrement(ref taskCount);
+			signal.Set();
 		}
 
 		public void Catch(Action<Exception> fn)
