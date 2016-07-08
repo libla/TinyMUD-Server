@@ -13,7 +13,7 @@ namespace TinyMUD
 			errors = new ConcurrentQueue<Exception>();
 		}
 
-		public void Run(Config config)
+		public void Run(Config config, Config common)
 		{
 			MainLoop = Loop.Current;
 			Config error = config["Error"];
@@ -41,23 +41,23 @@ namespace TinyMUD
 					}
 				});
 			}
-			OnInit(config);
+			OnInit(config, common);
 			MainLoop.Run();
-			Exit(config);
+			Exit(config, common);
 		}
 
-		internal abstract void OnInit(Config config);
-		protected virtual void Exit(Config config) { }
+		internal abstract void OnInit(Config config, Config common);
+		protected virtual void Exit(Config config, Config common) { }
 	}
 
 	public abstract class Service<T> : Service where T : Service<T>, new()
 	{
-		internal override void OnInit(Config config)
+		internal override void OnInit(Config config, Config common)
 		{
-			Init(config);
+			Init(config, common);
 		}
 
-		protected abstract void Init(Config config);
+		protected abstract void Init(Config config, Config common);
 
 		public static Service Instance()
 		{
