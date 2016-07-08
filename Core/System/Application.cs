@@ -72,7 +72,8 @@ namespace TinyMUD
 			pendings.Remove(type);
 		}
 
-		public static Action<Config> Load;
+		public static event Action<Config> Load;
+		public static event Action Unload;
 
 		public static void Startup(Config config)
 		{
@@ -178,6 +179,8 @@ namespace TinyMUD
 
 		public static void Exit()
 		{
+			if (Unload != null)
+				Unload();
 			for (int i = unloads.Count - 1; i >= 0; --i)
 			{
 				unloads[i]();
