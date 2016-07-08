@@ -139,6 +139,46 @@ namespace TinyMUD
 			return node.Value;
 		}
 
+		public static Config Combine(params Config[] configs)
+		{
+			ArrayNode array = new ArrayNode();
+			List<Config> tables = new List<Config>();
+			for (int i = 0; i < configs.Length; ++i)
+			{
+				if (configs[i].IsTable())
+				{
+					tables.Add(configs[i]);
+				}
+				else if (configs[i].IsArray())
+				{
+					foreach (Config config in configs[i])
+						array.list.Add(config);
+				}
+				else
+				{
+					array.list.Add(configs[i]);
+				}
+			}
+			TableNode table = null;
+			if (tables.Count > 0)
+			{
+				table = new TableNode();
+				for (int i = 0; i < tables.Count; ++i)
+				{
+					Config config = tables[i];
+					foreach (string key in config.Keys)
+					{
+						AddNode(table, key, config[key]);
+					}
+				}
+			}
+			if (table != null)
+				array.list.Add(table);
+			if (array.list.Count > 1)
+				return array;
+			return array[0];
+		}
+
 		public static Config Load(string input)
 		{
 			return Load(Encoding.UTF8.GetBytes(input));
