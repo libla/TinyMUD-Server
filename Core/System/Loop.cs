@@ -189,6 +189,7 @@ namespace TinyMUD
 
 		private readonly int threadId;
 		private int taskCount;
+		private Action<Exception> errfn;
 		private readonly SortedSet<Timer> timers;
 		private readonly List<Timer> expireTimers;
 		private readonly List<Action<Timer>> expireTimerActions;
@@ -274,7 +275,7 @@ namespace TinyMUD
 							}
 							catch (Exception e)
 							{
-								Log.Error(e);
+								Loop.errfn(e);
 							}
 						}
 						Loop.eventActions.Clear();
@@ -288,6 +289,7 @@ namespace TinyMUD
 		{
 			threadId = Thread.CurrentThread.ManagedThreadId;
 			taskCount = 0;
+			errfn = Log.Error;
 			timers = new SortedSet<Timer>(TimerComparer.Default);
 			expireTimers = new List<Timer>();
 			expireTimerActions = new List<Action<Timer>>();
@@ -387,6 +389,11 @@ namespace TinyMUD
 			Interlocked.Decrement(ref taskCount);
 		}
 
+		public void Catch(Action<Exception> fn)
+		{
+			errfn = fn;
+		}
+
 		public void Run()
 		{
 			if (Thread.CurrentThread.ManagedThreadId != threadId)
@@ -402,7 +409,7 @@ namespace TinyMUD
 					}
 					catch (Exception e)
 					{
-						Log.Error(e);
+						errfn(e);
 					}
 				}
 				if (taskCount == 0 && timers.Count == 0)
@@ -440,7 +447,7 @@ namespace TinyMUD
 					}
 					catch (Exception e)
 					{
-						Log.Error(e);
+						errfn(e);
 					}
 				}
 				expireTimers.Clear();
@@ -477,7 +484,7 @@ namespace TinyMUD
 					}
 					catch (Exception e)
 					{
-						Log.Error(e);
+						errfn(e);
 					}
 				}
 				long now = Application.Now;
@@ -509,7 +516,7 @@ namespace TinyMUD
 					}
 					catch (Exception e)
 					{
-						Log.Error(e);
+						errfn(e);
 					}
 				}
 				expireTimers.Clear();
