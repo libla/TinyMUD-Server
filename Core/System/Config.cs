@@ -53,6 +53,56 @@ namespace TinyMUD
 			get { return null; }
 		}
 
+		public static int ToInt(string val, int defaultVal)
+		{
+			if (val == null)
+				return defaultVal;
+			return int.Parse(val);
+		}
+
+		public static double ToDouble(string val, double defaultVal)
+		{
+			if (val == null)
+				return defaultVal;
+			return double.Parse(val);
+		}
+
+		public static bool ToBool(string val, bool defaultVal)
+		{
+			switch (val)
+			{
+			case null:
+				return defaultVal;
+			case "True":
+			case "true":
+			case "Yes":
+			case "yes":
+				return true;
+			case "False":
+			case "false":
+			case "No":
+			case "no":
+				return false;
+			default:
+				throw new FormatException();
+			}
+		}
+
+		public int ToInt(int defaultVal)
+		{
+			return ToInt(Value, defaultVal);
+		}
+
+		public double ToDouble(double defaultVal)
+		{
+			return ToDouble(Value, defaultVal);
+		}
+
+		public bool ToBool(bool defaultVal)
+		{
+			return ToBool(Value, defaultVal);
+		}
+
 		public virtual bool IsString()
 		{
 			return false;
@@ -128,6 +178,11 @@ namespace TinyMUD
 		}
 
 		public static bool operator false(Config node)
+		{
+			return !node.IsAny();
+		}
+
+		public static bool operator !(Config node)
 		{
 			return !node.IsAny();
 		}
