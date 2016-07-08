@@ -72,7 +72,9 @@ namespace TinyMUD
 			pendings.Remove(type);
 		}
 
-		public static void Startup(string[] args)
+		public static Action<Config> Load;
+
+		public static void Startup(Config config)
 		{
 			sinceStartup.Start();
 			TimeSpan ts = DateTime.UtcNow - UTCTime;
@@ -170,6 +172,8 @@ namespace TinyMUD
 			{
 				loads[i]();
 			}
+			if (Load != null)
+				Load(config);
 		}
 
 		public static void Exit()
