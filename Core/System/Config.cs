@@ -120,10 +120,7 @@ namespace TinyMUD
 
 		public virtual int Count
 		{
-			get
-			{
-				throw new NotImplementedException();
-			}
+			get { return 0; }
 		}
 
 		public virtual Config this[int index]

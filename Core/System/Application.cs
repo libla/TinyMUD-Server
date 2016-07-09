@@ -4,6 +4,8 @@ using System.Threading;
 using System.Reflection;
 using System.Diagnostics;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
+using System.Text.RegularExpressions;
 using System.Runtime.CompilerServices;
 
 namespace TinyMUD
@@ -38,6 +40,7 @@ namespace TinyMUD
 		private static double timeStartup;
 		private static readonly CancellationTokenSource cts = new CancellationTokenSource();
 		private static readonly List<Action> unloads = new List<Action>();
+		private static readonly ConcurrentDictionary<string, Type> cachetypes = new ConcurrentDictionary<string, Type>();
 
 		public static Loop MainLoop { get; private set; }
 		public static long Now
@@ -97,6 +100,63 @@ namespace TinyMUD
 
 		public static event Action<Config> Load;
 		public static event Action Unload;
+
+		public static Type FindType(string name)
+		{
+			Type value;
+			if (!cachetypes.TryGetValue(name, out value))
+			{
+				int index = name.LastIndexOf('.');
+				if (index == -1)
+					index = 0;
+				else
+					++index;
+				string typename = name.Substring(index);
+				LinkedList<string> namelist = new LinkedList<string>();
+				foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+				{
+					foreach (Type type in assembly.GetTypes())
+					{
+						if (type.IsGenericType)
+							continue;
+						if (type.Name == typename)
+						{
+							bool omit = false;
+							for (Type parent = type; parent != null; parent = parent.DeclaringType)
+								namelist.AddFirst(parent.Name);
+							if (!string.IsNullOrEmpty(type.Namespace))
+							{
+								Regex regex = new Regex("^TinyMUD(\\..+)?$");
+								if (regex.IsMatch(type.Namespace))
+									omit = true;
+								else
+									namelist.AddFirst(type.Namespace);
+							}
+							string tname = string.Join(".", namelist);
+							if (tname == name || (omit && type.Namespace + "." + tname == name))
+							{
+								cachetypes.TryAdd(name, type);
+								return type;
+							}
+							namelist.Clear();
+						}
+					}
+				}
+			}
+			return value;
+		}
+
+		public static object CreateType(Config config)
+		{
+			Type type = FindType(config["Type"].Value ?? config["type"].Value);
+			if (type == null)
+				throw new TypeLoadException();
+			Config param = config["Params"] ?? config["params"];
+			if (param.Count == 0)
+				return Activator.CreateInstance(type);
+			object args = new object[param.Count];
+			return Activator.CreateInstance(type, args);
+		}
 
 		public static void Startup(Config config)
 		{
