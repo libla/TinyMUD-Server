@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Threading;
 using System.Reflection;
 using System.Diagnostics;
@@ -72,6 +73,28 @@ namespace TinyMUD
 			pendings.Remove(type);
 		}
 
+		private static Action FindMethod(Type type, string name, string def)
+		{
+			if (name != null)
+			{
+				Action load = Delegate.CreateDelegate(typeof(Action), type, name) as Action;
+				if (load == null)
+					throw new MissingMethodException(type.FullName, name);
+				return load;
+			}
+			try
+			{
+				return Delegate.CreateDelegate(typeof(Action), type, def) as Action;
+			}
+			catch (MissingMethodException)
+			{
+			}
+			catch (MethodAccessException)
+			{
+			}
+			return null;
+		}
+
 		public static event Action<Config> Load;
 		public static event Action Unload;
 
@@ -82,9 +105,37 @@ namespace TinyMUD
 			timeStartup = ts.TotalMilliseconds;
 			Thread.CurrentThread.Name = "TinyMUD.Main";
 			MainLoop = Loop.Current;
+			Dictionary<Assembly, int> assemblies = new Dictionary<Assembly, int>();
+			foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+			{
+				assemblies[assembly] = 0;
+			}
+			Dictionary<string, string> imports = new Dictionary<string, string>();
+			foreach (Config import in config["Import"])
+			{
+				string name = import["Name"].Value ?? Guid.NewGuid().ToString();
+				if (imports.ContainsKey(name))
+					continue;
+				string path = import["Path"].Value;
+				if (File.Exists(path))
+				{
+					try
+					{
+						Assembly assembly = Assembly.LoadFrom(path);
+						imports.Add(name, path);
+						assemblies[assembly] = imports.Count;
+					}
+					catch (FileLoadException)
+					{
+					}
+					catch (BadImageFormatException)
+					{
+					}
+				}
+			}
 			Dictionary<Type, InitializeOnLoad> loadtypes = new Dictionary<Type, InitializeOnLoad>();
-			List<Type> loadlist = new List<Type>();
-			List<Action> loads = new List<Action>();
+			List<Tuple<Type, Assembly>> loadlist = new List<Tuple<Type, Assembly>>();
+			List<Tuple<Type, ModuleAttribute, Assembly>> modules = new List<Tuple<Type, ModuleAttribute, Assembly>>();
 			foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
 			{
 				foreach (Type type in assembly.GetTypes())
@@ -95,50 +146,7 @@ namespace TinyMUD
 						ModuleAttribute attr = attrs[i] as ModuleAttribute;
 						if (attr != null)
 						{
-							if (attr.Load == null)
-							{
-								try
-								{
-									Action load = Delegate.CreateDelegate(typeof(Action), type, "Load") as Action;
-									if (load != null)
-										loads.Add(load);
-								}
-								catch (MissingMethodException)
-								{
-								}
-								catch (MethodAccessException)
-								{
-								}
-							}
-							else
-							{
-								Action load = Delegate.CreateDelegate(typeof(Action), type, attr.Load) as Action;
-								if (load == null)
-									throw new MissingMethodException(type.FullName, attr.Load);
-								loads.Add(load);
-							}
-							if (attr.Unload == null)
-							{
-								try
-								{
-									Action unload = Delegate.CreateDelegate(typeof(Action), type, "Unload") as Action;
-									if (unload != null)
-										unloads.Add(unload);
-								}
-								catch (MissingMethodException)
-								{
-								}
-								catch (MethodAccessException)
-								{
-								}
-							}
-							else
-							{
-								Action unload = Delegate.CreateDelegate(typeof(Action), type, attr.Unload) as Action;
-								if (unload == null)
-									throw new MissingMethodException(type.FullName, attr.Unload);
-								unloads.Add(unload);
-							}
+							modules.Add(Tuple.Create(type, attr, assembly));
 							break;
 						}
 					}
@@ -150,28 +158,58 @@ namespace TinyMUD
 							if (!loadtypes.ContainsKey(type))
 							{
 								loadtypes.Add(type, attr);
-								loadlist.Add(type);
+								loadlist.Add(Tuple.Create(type, assembly));
 							}
 							break;
 						}
 					}
 				}
 			}
-			loadlist.Sort();
+			loadlist.Sort((x, y) =>
+			{
+				int prix;
+				if (!assemblies.TryGetValue(x.Item2, out prix))
+					prix = int.MaxValue;
+				int priy;
+				if (!assemblies.TryGetValue(y.Item2, out priy))
+					priy = int.MaxValue;
+				if (prix == priy)
+					return string.CompareOrdinal(x.Item1.FullName, y.Item1.FullName);
+				return prix - priy;
+			});
+			modules.Sort((x, y) =>
+			{
+				int prix;
+				if (!assemblies.TryGetValue(x.Item3, out prix))
+					prix = int.MaxValue;
+				int priy;
+				if (!assemblies.TryGetValue(y.Item3, out priy))
+					priy = int.MaxValue;
+				if (prix == priy)
+					return string.CompareOrdinal(x.Item1.FullName, y.Item1.FullName);
+				return prix - priy;
+			});
 			Type[] loadorders = new Type[loadlist.Count];
 			int index = 0;
 			Dictionary<Type, bool> pendings = new Dictionary<Type, bool>();
 			for (int i = 0; i < loadlist.Count; ++i)
 			{
-				SortLoad(loadtypes, pendings, loadorders, loadlist[i], ref index);
+				SortLoad(loadtypes, pendings, loadorders, loadlist[i].Item1, ref index);
 			}
 			for (int i = 0; i < loadorders.Length; ++i)
 			{
 				RuntimeHelpers.RunClassConstructor(loadorders[i].TypeHandle);
 			}
-			for (int i = 0; i < loads.Count; ++i)
+			for (int i = 0; i < modules.Count; ++i)
 			{
-				loads[i]();
+				Type type = modules[i].Item1;
+				ModuleAttribute attr = modules[i].Item2;
+				Action load = FindMethod(type, attr.Load, "Load");
+				if (load != null)
+					load();
+				Action unload = FindMethod(type, attr.Unload, "Unload");
+				if (unload != null)
+					unloads.Add(unload);
 			}
 			if (Load != null)
 				Load(config);

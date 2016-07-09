@@ -10,7 +10,7 @@ namespace TinyMUD
 	public abstract class Config : IEnumerable<Config>
 	{
 		#region 空实现返回优化
-		protected static readonly NullNode Null = new NullNode();
+		public static readonly Config Empty = new NullNode();
 		protected static readonly string[] EmptyKeys = new string[0];
 		protected static readonly Config[] EmptyValues = new Config[0];
 		#endregion
@@ -130,7 +130,7 @@ namespace TinyMUD
 		{
 			get
 			{
-				return Null;
+				return Empty;
 			}
 		}
 
@@ -138,7 +138,7 @@ namespace TinyMUD
 		{
 			get
 			{
-				return Null;
+				return Empty;
 			}
 		}
 
