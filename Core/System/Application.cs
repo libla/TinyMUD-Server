@@ -148,13 +148,62 @@ namespace TinyMUD
 
 		public static object CreateType(Config config)
 		{
-			Type type = FindType(config["Type"].Value ?? config["type"].Value);
+			Type type = FindType(config["Type"].Value);
 			if (type == null)
 				throw new TypeLoadException();
-			Config param = config["Params"] ?? config["params"];
+			Config param = config["Params"];
 			if (param.Count == 0)
 				return Activator.CreateInstance(type);
-			object args = new object[param.Count];
+			object[] args = new object[param.Count];
+			for (int i = 0; i < param.Count; ++i)
+			{
+				Config pm = param[i];
+				string stype = pm["Type"].Value ?? "String";
+				string svalue = pm["Value"].Value;
+				switch (stype)
+				{
+				case "Integer":
+				case "integer":
+					args[i] = int.Parse(svalue);
+					break;
+				case "Number":
+				case "number":
+					args[i] = double.Parse(svalue);
+					break;
+				case "Boolean":
+				case "boolean":
+					if (svalue == null)
+						throw new ArgumentNullException();
+					switch (svalue)
+					{
+					case "True":
+					case "true":
+					case "Yes":
+					case "yes":
+					case "Y":
+					case "y":
+						args[i] = true;
+						break;
+					case "False":
+					case "false":
+					case "No":
+					case "no":
+					case "N":
+					case "n":
+						args[i] = false;
+						break;
+					default:
+						throw new FormatException();
+					}
+					break;
+				case "String":
+				case "string":
+					args[i] = svalue;
+					break;
+				default:
+					throw new TypeLoadException();
+				}
+			}
 			return Activator.CreateInstance(type, args);
 		}
 
