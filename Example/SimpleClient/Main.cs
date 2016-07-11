@@ -2,6 +2,7 @@
 
 namespace TinyMUD
 {
+	[Module]
     public class SimpleClient
     {
 		static Session s;

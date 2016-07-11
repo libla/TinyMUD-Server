@@ -2,6 +2,7 @@
 
 namespace TinyMUD
 {
+	[Module]
     public class SimpleServer
     {
 		static Server s;
