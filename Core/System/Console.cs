@@ -13,7 +13,7 @@ namespace TinyMUD
 		private static readonly BlockingCollection<string> list = new BlockingCollection<string>(new ConcurrentQueue<string>());
 
 		private static readonly WeakTable<Loop, Action<string>> actions = new WeakTable<Loop, Action<string>>();
-		private static readonly List<KeyValuePair<Loop, Action<string>>> actionstmp = new List<KeyValuePair<Loop, Action<string>>>();
+		private static readonly List<Tuple<Loop, Action<string>>> actionstmp = new List<Tuple<Loop, Action<string>>>();
 
 		static Console()
 		{
@@ -43,29 +43,22 @@ namespace TinyMUD
 					Monitor.Enter(locker);
 					inputing = true;
 					Monitor.Exit(locker);
-					Task<string> task = System.Console.In.ReadLineAsync();
-					try
-					{
-						task.Wait(Application.RunState);
-					}
-					catch (OperationCanceledException)
-					{
+					string result = System.Console.In.ReadLine();
+					if (Application.RunState.IsCancellationRequested)
 						return;
-					}
 					Monitor.Enter(locker);
 					inputing = false;
 					Monitor.Pulse(locker);
 					Monitor.Exit(locker);
-					string result = task.Result;
 					lock (actions)
 					{
 						foreach (var kv in actions)
-							actionstmp.Add(kv);
+							actionstmp.Add(Tuple.Create(kv.Key, kv.Value));
 					}
 					for (int i = 0; i < actionstmp.Count; ++i)
 					{
-						Action<string> action = actionstmp[i].Value;
-						actionstmp[i].Key.Execute(() =>
+						Action<string> action = actionstmp[i].Item2;
+						actionstmp[i].Item1.Execute(() =>
 						{
 							action(result);
 						});
