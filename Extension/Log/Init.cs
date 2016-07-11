@@ -13,9 +13,20 @@ namespace TinyMUD.Extension
 			{
 				if (config)
 				{
-					foreach (Config log in config["Log"])
+					Config logs = config["Log"];
+					if (logs.IsArray())
 					{
-						Log.Sink sink = Application.CreateType(log) as Log.Sink;
+						foreach (Config log in logs)
+						{
+							Log.Sink sink = Application.CreateType(log) as Log.Sink;
+							if (sink == null)
+								throw new TypeLoadException();
+							Log.Add(sink);
+						}
+					}
+					else
+					{
+						Log.Sink sink = Application.CreateType(logs) as Log.Sink;
 						if (sink == null)
 							throw new TypeLoadException();
 						Log.Add(sink);
