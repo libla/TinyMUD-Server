@@ -32,8 +32,8 @@ namespace TinyMUD
 				help.AddOptions(this);
 				return help.ToString();
 			}
-
 		}
+
 		static void Main(string[] args)
 		{
 			Options options = new Options();
