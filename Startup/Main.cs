@@ -25,7 +25,7 @@ namespace TinyMUD
 			{
 				Assembly assembly = Assembly.GetExecutingAssembly();
 				AssemblyProductAttribute product = (AssemblyProductAttribute)Attribute.GetCustomAttribute(assembly, typeof(AssemblyProductAttribute));
-				HelpText help = new HelpText(string.Format("{0} {1}", product.Product, assembly.GetName().Version))
+				HelpText help = new HelpText(string.Format("{0} v{1}", product.Product, assembly.GetName().Version))
 				{
 					AddDashesToOption = true,
 				};
