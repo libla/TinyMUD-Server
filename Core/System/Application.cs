@@ -207,7 +207,7 @@ namespace TinyMUD
 			return Activator.CreateInstance(type, args);
 		}
 
-		public static void Startup(Config config)
+		public static void Startup(Config config, params string[] pathimports)
 		{
 			sinceStartup.Start();
 			TimeSpan ts = DateTime.UtcNow - UTCTime;
@@ -226,6 +226,25 @@ namespace TinyMUD
 				if (imports.ContainsKey(name))
 					continue;
 				string path = import["Path"].Value;
+				if (File.Exists(path))
+				{
+					try
+					{
+						Assembly assembly = Assembly.LoadFrom(path);
+						imports.Add(name, path);
+						assemblies[assembly] = imports.Count;
+					}
+					catch (FileLoadException)
+					{
+					}
+					catch (BadImageFormatException)
+					{
+					}
+				}
+			}
+			foreach (string path in pathimports)
+			{
+				string name = Guid.NewGuid().ToString();
 				if (File.Exists(path))
 				{
 					try
