@@ -12,7 +12,6 @@ namespace TinyMUD.Extension
 		private FileStream file;
 		private byte[] buffer;
 		private int capacity;
-		private readonly byte[] newline;
 
 		public FileLog(string path, Encoding e)
 		{
@@ -21,8 +20,8 @@ namespace TinyMUD.Extension
 			date = 0;
 			file = null;
 			capacity = 0;
-			newline = encoding.GetBytes("\n");
 		}
+
 		public FileLog(string path) : this(path, Encoding.UTF8) { }
 
 		~FileLog()
@@ -71,7 +70,7 @@ namespace TinyMUD.Extension
 				}
 				int length = encoding.GetBytes(text, 0, text.Length, buffer, 0);
 				file.Write(buffer, 0, length);
-				file.Write(newline, 0, newline.Length);
+				file.WriteByte((byte)'\n');
 			}
 		}
 
