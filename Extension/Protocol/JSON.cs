@@ -115,7 +115,10 @@ namespace TinyMUD.Extension
 
 			protected override void WriteKey(int key)
 			{
-				WriteString("@" + key.ToString());
+				stream.WriteByte((byte)'"');
+				stream.WriteByte((byte)'@');
+				WriteInt(key);
+				stream.WriteByte((byte)'"');
 				stream.WriteByte((byte)':');
 			}
 

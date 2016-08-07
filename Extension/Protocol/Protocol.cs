@@ -124,6 +124,12 @@ namespace TinyMUD.Extension
 			}
 
 			#region 读取字段
+
+			public void Skip()
+			{
+				Skip(stream);
+			}
+
 			public void ReadValue<T>(ref T t) where T : Value
 			{
 				HandlerAction<T> handleract = Pool<HandlerAction<T>>.Default.Acquire();
