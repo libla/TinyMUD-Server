@@ -25,7 +25,7 @@ namespace TinyMUD.Extension
 				throw new NotImplementedException();
 			}
 
-			protected override void ReadTable(Stream stream, Action<Reader, string> readtype)
+			protected override void ReadTable(Stream stream, Action<Reader, int> readtype)
 			{
 				throw new NotImplementedException();
 			}
@@ -113,9 +113,9 @@ namespace TinyMUD.Extension
 				stream.WriteByte((byte)']');
 			}
 
-			protected override void WriteKey(string key)
+			protected override void WriteKey(int key)
 			{
-				WriteString(key);
+				WriteString("@" + key.ToString());
 				stream.WriteByte((byte)':');
 			}
 

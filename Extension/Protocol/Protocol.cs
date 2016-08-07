@@ -8,7 +8,7 @@ namespace TinyMUD.Extension
 	{
 		public interface Value
 		{
-			void Read(Reader reader, string key);
+			void Read(Reader reader, int key);
 			IEnumerator<Action<Writer>> Write();
 		}
 
@@ -23,11 +23,11 @@ namespace TinyMUD.Extension
 			private class HandlerAction<T> where T : Value
 			{
 				public T handler;
-				public readonly Action<Reader, string> action;
-
+				public readonly Action<Reader, int> action;
+				
 				public HandlerAction()
 				{
-					action = (parser, s) => handler.Read(parser, s);
+					action = (parser, k) => handler.Read(parser, k);
 				}
 			}
 
@@ -271,7 +271,7 @@ namespace TinyMUD.Extension
 			#endregion
 
 			public abstract void Skip(Stream stream);
-			protected abstract void ReadTable(Stream stream, Action<Reader, string> readtype);
+			protected abstract void ReadTable(Stream stream, Action<Reader, int> readtype);
 			protected abstract void ReadArray(Stream stream, Action<Reader> readarray);
 			protected abstract bool ReadBool(Stream stream);
 			protected abstract int ReadInt(Stream stream);
@@ -440,7 +440,7 @@ namespace TinyMUD.Extension
 			#region 优化GC
 			private class KeyValue<T> where T : Value
 			{
-				public string key;
+				public int key;
 				public T value;
 				public readonly Action<Writer> action;
 
@@ -457,7 +457,7 @@ namespace TinyMUD.Extension
 
 			private class BoolKeyValue
 			{
-				public string key;
+				public int key;
 				public bool value;
 				public readonly Action<Writer> action;
 
@@ -474,7 +474,7 @@ namespace TinyMUD.Extension
 
 			private class IntKeyValue
 			{
-				public string key;
+				public int key;
 				public int value;
 				public readonly Action<Writer> action;
 
@@ -491,7 +491,7 @@ namespace TinyMUD.Extension
 
 			private class FloatKeyValue
 			{
-				public string key;
+				public int key;
 				public double value;
 				public readonly Action<Writer> action;
 
@@ -508,7 +508,7 @@ namespace TinyMUD.Extension
 
 			private class StringKeyValue
 			{
-				public string key;
+				public int key;
 				public string value;
 				public readonly Action<Writer> action;
 
@@ -525,7 +525,7 @@ namespace TinyMUD.Extension
 
 			private class ArrayKeyValue<T> where T : Value
 			{
-				public string key;
+				public int key;
 				public IList<T> list;
 				public readonly Action<Writer> action;
 
@@ -543,7 +543,7 @@ namespace TinyMUD.Extension
 
 			private class BoolArrayKeyValue
 			{
-				public string key;
+				public int key;
 				public IList<bool> list;
 				public readonly Action<Writer> action;
 
@@ -561,7 +561,7 @@ namespace TinyMUD.Extension
 
 			private class IntArrayKeyValue
 			{
-				public string key;
+				public int key;
 				public IList<int> list;
 				public readonly Action<Writer> action;
 
@@ -579,7 +579,7 @@ namespace TinyMUD.Extension
 
 			private class FloatArrayKeyValue
 			{
-				public string key;
+				public int key;
 				public IList<double> list;
 				public readonly Action<Writer> action;
 
@@ -597,7 +597,7 @@ namespace TinyMUD.Extension
 
 			private class StringArrayKeyValue
 			{
-				public string key;
+				public int key;
 				public IList<string> list;
 				public readonly Action<Writer> action;
 
@@ -624,7 +624,7 @@ namespace TinyMUD.Extension
 			}
 
 			#region 写入字段
-			public static Action<Writer> WriteValue<T>(string key, T t) where T : Value
+			public static Action<Writer> WriteValue<T>(int key, T t) where T : Value
 			{
 				var kv = Pool<KeyValue<T>>.Default.Acquire();
 				kv.key = key;
@@ -632,7 +632,7 @@ namespace TinyMUD.Extension
 				return kv.action;
 			}
 
-			public static Action<Writer> WriteValue(string key, bool b)
+			public static Action<Writer> WriteValue(int key, bool b)
 			{
 				var kv = Pool<BoolKeyValue>.Default.Acquire();
 				kv.key = key;
@@ -640,7 +640,7 @@ namespace TinyMUD.Extension
 				return kv.action;
 			}
 
-			public static Action<Writer> WriteValue(string key, int i)
+			public static Action<Writer> WriteValue(int key, int i)
 			{
 				var kv = Pool<IntKeyValue>.Default.Acquire();
 				kv.key = key;
@@ -648,7 +648,7 @@ namespace TinyMUD.Extension
 				return kv.action;
 			}
 
-			public static Action<Writer> WriteValue(string key, double d)
+			public static Action<Writer> WriteValue(int key, double d)
 			{
 				var kv = Pool<FloatKeyValue>.Default.Acquire();
 				kv.key = key;
@@ -656,7 +656,7 @@ namespace TinyMUD.Extension
 				return kv.action;
 			}
 
-			public static Action<Writer> WriteValue(string key, string s)
+			public static Action<Writer> WriteValue(int key, string s)
 			{
 				var kv = Pool<StringKeyValue>.Default.Acquire();
 				kv.key = key;
@@ -664,7 +664,7 @@ namespace TinyMUD.Extension
 				return kv.action;
 			}
 
-			public static Action<Writer> WriteValue<T>(string key, List<T> list) where T : Value
+			public static Action<Writer> WriteValue<T>(int key, List<T> list) where T : Value
 			{
 				if (list == null || list.Count == 0)
 					return null;
@@ -674,7 +674,7 @@ namespace TinyMUD.Extension
 				return kv.action;
 			}
 
-			public static Action<Writer> WriteValue(string key, List<bool> list)
+			public static Action<Writer> WriteValue(int key, List<bool> list)
 			{
 				if (list == null || list.Count == 0)
 					return null;
@@ -684,7 +684,7 @@ namespace TinyMUD.Extension
 				return kv.action;
 			}
 
-			public static Action<Writer> WriteValue(string key, List<int> list)
+			public static Action<Writer> WriteValue(int key, List<int> list)
 			{
 				if (list == null || list.Count == 0)
 					return null;
@@ -694,7 +694,7 @@ namespace TinyMUD.Extension
 				return kv.action;
 			}
 
-			public static Action<Writer> WriteValue(string key, List<double> list)
+			public static Action<Writer> WriteValue(int key, List<double> list)
 			{
 				if (list == null || list.Count == 0)
 					return null;
@@ -704,7 +704,7 @@ namespace TinyMUD.Extension
 				return kv.action;
 			}
 
-			public static Action<Writer> WriteValue(string key, List<string> list)
+			public static Action<Writer> WriteValue(int key, List<string> list)
 			{
 				if (list == null || list.Count == 0)
 					return null;
@@ -714,7 +714,7 @@ namespace TinyMUD.Extension
 				return kv.action;
 			}
 
-			public static Action<Writer> WriteValue<T>(string key, T[] array) where T : Value
+			public static Action<Writer> WriteValue<T>(int key, T[] array) where T : Value
 			{
 				if (array == null || array.Length == 0)
 					return null;
@@ -724,7 +724,7 @@ namespace TinyMUD.Extension
 				return kv.action;
 			}
 
-			public static Action<Writer> WriteValue(string key, bool[] array)
+			public static Action<Writer> WriteValue(int key, bool[] array)
 			{
 				if (array == null || array.Length == 0)
 					return null;
@@ -734,7 +734,7 @@ namespace TinyMUD.Extension
 				return kv.action;
 			}
 
-			public static Action<Writer> WriteValue(string key, int[] array)
+			public static Action<Writer> WriteValue(int key, int[] array)
 			{
 				if (array == null || array.Length == 0)
 					return null;
@@ -744,7 +744,7 @@ namespace TinyMUD.Extension
 				return kv.action;
 			}
 
-			public static Action<Writer> WriteValue(string key, double[] array)
+			public static Action<Writer> WriteValue(int key, double[] array)
 			{
 				if (array == null || array.Length == 0)
 					return null;
@@ -754,7 +754,7 @@ namespace TinyMUD.Extension
 				return kv.action;
 			}
 
-			public static Action<Writer> WriteValue(string key, string[] array)
+			public static Action<Writer> WriteValue(int key, string[] array)
 			{
 				if (array == null || array.Length == 0)
 					return null;
@@ -849,7 +849,7 @@ namespace TinyMUD.Extension
 
 			protected abstract void WriteTable(Cursor cursor);
 			protected abstract void WriteArray(Cursor cursor);
-			protected abstract void WriteKey(string key);
+			protected abstract void WriteKey(int key);
 			protected abstract void WriteBool(bool b);
 			protected abstract void WriteInt(int i);
 			protected abstract void WriteFloat(double d);
