@@ -9,17 +9,12 @@ namespace TinyMUD.Extension
 {
 	public static partial class Protocol
 	{
-		public static Reader JSONReader()
+		public static Format JSON()
 		{
-			return new JsonReader();
+			return new JsonFormat();
 		}
 
-		public static Writer JSONWriter()
-		{
-			return new JsonWriter();
-		}
-
-		private class JsonReader : Reader
+		private class JsonFormat : Format
 		{
 			private int token;
 			private Stream stream;
@@ -27,9 +22,12 @@ namespace TinyMUD.Extension
 			private readonly byte[] utf8bits = new byte[8];
 
 			private static readonly byte[] utf8heads = {0xff, 0xfe, 0xfc, 0xf8};
+			private static readonly byte[] truebytes = { (byte)'t', (byte)'r', (byte)'u', (byte)'e' };
+			private static readonly byte[] falsebytes = { (byte)'f', (byte)'a', (byte)'l', (byte)'s', (byte)'e' };
+			private static readonly byte[] unicodebytes = { (byte)'\\', (byte)'u', (byte)'0', (byte)'0' };
 
-			private static readonly Action<Reader, int> SkipTable = (reader, i) => reader.Skip();
-			private static readonly Action<Reader> SkipArray = reader => reader.Skip();
+			private static readonly Action<Format, int> SkipTable = (reader, i) => reader.Skip();
+			private static readonly Action<Format> SkipArray = reader => reader.Skip();
 
 			#region 加速Pow运算
 			private static readonly double[] e = { // 1e-0...1e308: 309 * 8 bytes = 2472 bytes
@@ -57,6 +55,24 @@ namespace TinyMUD.Extension
 			}
 			#endregion
 
+			#region 转义字符表
+			private static readonly char[] escapes = {
+				/*
+					This array maps the 128 ASCII characters into character escape.
+					'u' indicate must transform to \u00xx.
+				*/
+				'u', 'u', 'u', 'u', 'u', 'u', 'u', 'u', 'b', 't', 'n', 'u', 'f',  'r', 'u', 'u',
+				'u', 'u', 'u', 'u', 'u', 'u', 'u', 'u', 'u', 'u', 'u', 'u', 'u',  'u', 'u', 'u',
+				'#', '#', '"', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#',  '#', '#', '#',
+				'#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#',  '#', '#', '#',
+				'#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#',  '#', '#', '#',
+				'#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '\\', '#', '#', '#',
+				'#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#',  '#', '#', '#',
+				'#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#',  '#', '#', '#',
+			};
+			#endregion
+
+			#region 读取处理实现
 			public override void Skip()
 			{
 				SkipWhitespace();
@@ -83,7 +99,7 @@ namespace TinyMUD.Extension
 				}
 			}
 
-			protected override void ReadTable(Action<Reader, int> readtype)
+			protected override void ReadTable(Action<Format, int> readtype)
 			{
 				SkipWhitespace();
 				if (token != (byte)'{')
@@ -108,7 +124,7 @@ namespace TinyMUD.Extension
 				}
 			}
 
-			protected override void ReadArray(Action<Reader> readarray)
+			protected override void ReadArray(Action<Format> readarray)
 			{
 				SkipWhitespace();
 				if (token != (byte)'[')
@@ -344,13 +360,13 @@ namespace TinyMUD.Extension
 				return result;
 			}
 
-			protected override void Prepare(Stream stream)
+			protected override void PrepareRead(Stream stream)
 			{
 				this.stream = stream;
 				this.token = stream.ReadByte();
 			}
 
-			protected override void Flush()
+			protected override void FlushRead()
 			{
 				SkipWhitespace();
 				if (token != -1 && token != (byte)'\0')
@@ -395,33 +411,9 @@ namespace TinyMUD.Extension
 			{
 				token = stream.ReadByte();
 			}
-		}
-
-		private class JsonWriter : Writer
-		{
-			private Stream stream;
-
-			#region 转义字符表
-			private static readonly char[] escapes = {
-				/*
-					This array maps the 128 ASCII characters into character escape.
-					'u' indicate must transform to \u00xx.
-				*/
-				'u', 'u', 'u', 'u', 'u', 'u', 'u', 'u', 'b', 't', 'n', 'u', 'f',  'r', 'u', 'u',
-				'u', 'u', 'u', 'u', 'u', 'u', 'u', 'u', 'u', 'u', 'u', 'u', 'u',  'u', 'u', 'u',
-				'#', '#', '"', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#',  '#', '#', '#',
-				'#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#',  '#', '#', '#',
-				'#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#',  '#', '#', '#',
-				'#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '\\', '#', '#', '#',
-				'#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#',  '#', '#', '#',
-				'#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#',  '#', '#', '#',
-			};
 			#endregion
 
-			private static readonly byte[] truebytes = { (byte)'t', (byte)'r', (byte)'u', (byte)'e' };
-			private static readonly byte[] falsebytes = { (byte)'f', (byte)'a', (byte)'l', (byte)'s', (byte)'e' };
-			private static readonly byte[] unicodebytes = { (byte)'\\', (byte)'u', (byte)'0', (byte)'0' };
-
+			#region 写入处理实现
 			protected override void WriteTable(Cursor cursor)
 			{
 				stream.WriteByte((byte)'{');
@@ -543,12 +535,12 @@ namespace TinyMUD.Extension
 				stream.WriteByte((byte)'"');
 			}
 
-			protected override void Prepare(Stream stream)
+			protected override void PrepareWrite(Stream stream)
 			{
 				this.stream = stream;
 			}
 
-			protected override void Flush()
+			protected override void FlushWrite()
 			{
 				stream = null;
 			}
@@ -559,6 +551,7 @@ namespace TinyMUD.Extension
 					return (byte)('0' + c);
 				return (byte)('A' + c - 10);
 			}
+			#endregion
 		}
 	}
 }
