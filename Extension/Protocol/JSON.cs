@@ -24,6 +24,9 @@ namespace TinyMUD.Extension
 			private int token;
 			private Stream stream;
 			private readonly StringBuilder builder = new StringBuilder();
+			private readonly byte[] utf8bits = new byte[8];
+
+			private static readonly byte[] utf8heads = {0xff, 0xfe, 0xfc, 0xf8};
 
 			private static readonly Action<Reader, int> SkipTable = (reader, i) => reader.Skip();
 			private static readonly Action<Reader> SkipArray = reader => reader.Skip();
@@ -287,6 +290,48 @@ namespace TinyMUD.Extension
 						default:
 							throw new SerializationException();
 						}
+					}
+					else if (token >= 0xf0)
+					{
+						int bits = 4;
+						for (int i = 0; i < utf8heads.Length; ++i)
+						{
+							if (token >= utf8heads[i])
+							{
+								bits = 8 - i;
+								break;
+							}
+						}
+						utf8bits[0] = (byte)token;
+						for (int i = 1; i < bits; ++i)
+						{
+							utf8bits[i] = Next();
+						}
+						builder.Append(Encoding.UTF8.GetString(utf8bits, 0, bits));
+					}
+					else if (token >= 0x80)
+					{
+						int unicode;
+						int bits;
+						if (token >= 0xe0)
+						{
+							unicode = token & 0x0f;
+							bits = 3;
+						}
+						else if (token >= 0xc0)
+						{
+							unicode = token & 0x1f;
+							bits = 2;
+						}
+						else
+						{
+							throw new SerializationException();
+						}
+						for (int i = 1; i < bits; ++i)
+						{
+							unicode = (unicode << 6) | (Next() & 0x3f);
+						}
+						builder.Append((char)unicode);
 					}
 					else
 					{
