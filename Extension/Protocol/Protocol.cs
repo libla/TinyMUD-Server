@@ -112,52 +112,44 @@ namespace TinyMUD.Extension
 			}
 			#endregion
 
-			private Stream stream;
-
 			public T Load<T>(Stream stream) where T : Value, new()
 			{
-				this.stream = stream;
+				Prepare(stream);
 				T t = new T();
 				ReadValue(ref t);
-				this.stream = null;
+				Flush();
 				return t;
 			}
 
 			#region 读取字段
 
-			public void Skip()
-			{
-				Skip(stream);
-			}
-
 			public void ReadValue<T>(ref T t) where T : Value
 			{
 				HandlerAction<T> handleract = Pool<HandlerAction<T>>.Default.Acquire();
 				handleract.handler = t;
-				ReadTable(stream, handleract.action);
+				ReadTable(handleract.action);
 				t = handleract.handler;
 				Pool<HandlerAction<T>>.Default.Release(handleract);
 			}
 
 			public void ReadValue(ref bool b)
 			{
-				b = ReadBool(stream);
+				b = ReadBool();
 			}
 
 			public void ReadValue(ref int i)
 			{
-				i = ReadInt(stream);
-				stream.ReadBytes(new byte[100], 0, 100);
+				i = ReadInt();
 			}
 
 			public void ReadValue(ref double d)
 			{
-				d = ReadFloat(stream);
+				d = ReadFloat();
 			}
 
 			public void ReadValue(ref string s)
 			{
-				s = ReadString(stream);
+				s = ReadString();
 			}
 
 			public void ReadValue<T>(ref List<T> list) where T : Value, new()
@@ -168,7 +160,7 @@ namespace TinyMUD.Extension
 				else
 					list.Clear();
 				handleract.list = list;
-				ReadArray(stream, handleract.action);
+				ReadArray(handleract.action);
 				handleract.list = null;
 				Pool<ArrayHandlerAction<T>>.Default.Release(handleract);
 			}
@@ -181,7 +173,7 @@ namespace TinyMUD.Extension
 				else
 					list.Clear();
 				handleract.list = list;
-				ReadArray(stream, handleract.action);
+				ReadArray(handleract.action);
 				handleract.list = null;
 				Pool<BoolArrayHandlerAction>.Default.Release(handleract);
 			}
@@ -194,7 +186,7 @@ namespace TinyMUD.Extension
 				else
 					list.Clear();
 				handleract.list = list;
-				ReadArray(stream, handleract.action);
+				ReadArray(handleract.action);
 				handleract.list = null;
 				Pool<IntArrayHandlerAction>.Default.Release(handleract);
 			}
@@ -207,7 +199,7 @@ namespace TinyMUD.Extension
 				else
 					list.Clear();
 				handleract.list = list;
-				ReadArray(stream, handleract.action);
+				ReadArray(handleract.action);
 				handleract.list = null;
 				Pool<FloatArrayHandlerAction>.Default.Release(handleract);
 			}
@@ -220,7 +212,7 @@ namespace TinyMUD.Extension
 				else
 					list.Clear();
 				handleract.list = list;
-				ReadArray(stream, handleract.action);
+				ReadArray(handleract.action);
 				handleract.list = null;
 				Pool<StringArrayHandlerAction>.Default.Release(handleract);
 			}
@@ -229,7 +221,7 @@ namespace TinyMUD.Extension
 			{
 				ArrayHandlerAction<T> handleract = Pool<ArrayHandlerAction<T>>.Default.Acquire();
 				handleract.list = new List<T>();
-				ReadArray(stream, handleract.action);
+				ReadArray(handleract.action);
 				array = handleract.list.ToArray();
 				handleract.list = null;
 				Pool<ArrayHandlerAction<T>>.Default.Release(handleract);
@@ -239,7 +231,7 @@ namespace TinyMUD.Extension
 			{
 				BoolArrayHandlerAction handleract = Pool<BoolArrayHandlerAction>.Default.Acquire();
 				handleract.list = new List<bool>();
-				ReadArray(stream, handleract.action);
+				ReadArray(handleract.action);
 				array = handleract.list.ToArray();
 				handleract.list = null;
 				Pool<BoolArrayHandlerAction>.Default.Release(handleract);
@@ -249,7 +241,7 @@ namespace TinyMUD.Extension
 			{
 				IntArrayHandlerAction handleract = Pool<IntArrayHandlerAction>.Default.Acquire();
 				handleract.list = new List<int>();
-				ReadArray(stream, handleract.action);
+				ReadArray(handleract.action);
 				array = handleract.list.ToArray();
 				handleract.list = null;
 				Pool<IntArrayHandlerAction>.Default.Release(handleract);
@@ -259,7 +251,7 @@ namespace TinyMUD.Extension
 			{
 				FloatArrayHandlerAction handleract = Pool<FloatArrayHandlerAction>.Default.Acquire();
 				handleract.list = new List<double>();
-				ReadArray(stream, handleract.action);
+				ReadArray(handleract.action);
 				array = handleract.list.ToArray();
 				handleract.list = null;
 				Pool<FloatArrayHandlerAction>.Default.Release(handleract);
@@ -269,20 +261,22 @@ namespace TinyMUD.Extension
 			{
 				StringArrayHandlerAction handleract = Pool<StringArrayHandlerAction>.Default.Acquire();
 				handleract.list = new List<string>();
-				ReadArray(stream, handleract.action);
+				ReadArray(handleract.action);
 				array = handleract.list.ToArray();
 				handleract.list = null;
 				Pool<StringArrayHandlerAction>.Default.Release(handleract);
 			}
 			#endregion
 
-			public abstract void Skip(Stream stream);
-			protected abstract void ReadTable(Stream stream, Action<Reader, int> readtype);
-			protected abstract void ReadArray(Stream stream, Action<Reader> readarray);
-			protected abstract bool ReadBool(Stream stream);
-			protected abstract int ReadInt(Stream stream);
-			protected abstract double ReadFloat(Stream stream);
-			protected abstract string ReadString(Stream stream);
+			public abstract void Skip();
+			protected abstract void ReadTable(Action<Reader, int> readtype);
+			protected abstract void ReadArray(Action<Reader> readarray);
+			protected abstract bool ReadBool();
+			protected abstract int ReadInt();
+			protected abstract double ReadFloat();
+			protected abstract string ReadString();
+			protected abstract void Prepare(Stream stream);
+			protected virtual void Flush() { }
 		}
 
 		public abstract class Writer
@@ -632,6 +626,8 @@ namespace TinyMUD.Extension
 			#region 写入字段
 			public static Action<Writer> WriteValue<T>(int key, T t) where T : Value
 			{
+				if (t == null)
+					return null;
 				var kv = Pool<KeyValue<T>>.Default.Acquire();
 				kv.key = key;
 				kv.value = t;
