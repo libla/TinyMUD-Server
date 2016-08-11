@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.IO;
 using System.Text;
 using System.Runtime.Serialization;
@@ -20,7 +20,7 @@ namespace TinyMUD.Extension
 			private static readonly Action<Format, int> SkipTable = (reader, i) => reader.Skip();
 			private static readonly Action<Format> SkipArray = reader => reader.Skip();
 
-			#region Êı¾İÀàĞÍ
+			#region æ•°æ®ç±»å‹
 			private enum TypeTag
 			{
 				True = 0x09,
@@ -34,7 +34,7 @@ namespace TinyMUD.Extension
 			}
 			#endregion
 
-			#region ×Ö·û´®×Ö½ÚÊı×é»º´æ
+			#region å­—ç¬¦ä¸²å­—èŠ‚æ•°ç»„ç¼“å­˜
 			private byte[] stringbuffer = new byte[16];
 
 			private void CheckStringBuffer(int len)
@@ -49,7 +49,7 @@ namespace TinyMUD.Extension
 			}
 			#endregion
 
-			#region ¶ÁÈ¡´¦ÀíÊµÏÖ
+			#region è¯»å–å¤„ç†å®ç°
 			public override void Skip()
 			{
 				if (token == -1)
@@ -250,7 +250,7 @@ namespace TinyMUD.Extension
 			}
 			#endregion
 
-			#region Ğ´Èë´¦ÀíÊµÏÖ
+			#region å†™å…¥å¤„ç†å®ç°
 			protected override void WriteTable(Cursor cursor)
 			{
 				int high = (int)TypeTag.Object << 4;
