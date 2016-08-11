@@ -11,10 +11,10 @@ namespace TinyMUD.Extension
 	{
 		public static Format JSON()
 		{
-			return new JsonFormat();
+			return new JSONFormat();
 		}
 
-		private class JsonFormat : Format
+		private class JSONFormat : Format
 		{
 			private int token;
 			private Stream stream;
@@ -369,6 +369,7 @@ namespace TinyMUD.Extension
 			protected override void FlushRead()
 			{
 				SkipWhitespace();
+				stream = null;
 				if (token != -1 && token != (byte)'\0')
 					throw new SerializationException();
 			}
