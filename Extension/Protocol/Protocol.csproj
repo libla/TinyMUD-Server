@@ -37,6 +37,7 @@
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Binary.cs" />
     <Compile Include="Protocol.cs" />
     <Compile Include="JSON.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
