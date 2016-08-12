@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Reflection;
 using System.Diagnostics;
 using System.Collections.Generic;
@@ -23,10 +24,13 @@ public class PreTestAttribute : Attribute
 {
 	public string Name { get; private set; }
 
+	public int Priority;
+
 	public PreTestAttribute() : this("") { }
 	public PreTestAttribute(string s)
 	{
 		Name = s;
+		Priority = 0;
 	}
 }
 
@@ -73,8 +77,50 @@ static class TestCase
 	struct Testing
 	{
 		public string Name;
+		public string Path;
 		public Action<int> Action;
 		public Action[] Prepares;
+	}
+
+	abstract class Matcher
+	{
+		public abstract bool IsMatch(string str);
+
+		public static Matcher Create(string s)
+		{
+			if (s.StartsWith("~"))
+				return new RegexMatch(s.Substring(1));
+			return new StrEqual(s);
+		}
+
+		private class StrEqual : Matcher
+		{
+			private readonly string templet;
+
+			public StrEqual(string s)
+			{
+				templet = s;
+			}
+			public override bool IsMatch(string str)
+			{
+				return templet == str;
+			}
+		}
+
+		private class RegexMatch : Matcher
+		{
+			private readonly Regex expr;
+
+			public RegexMatch(string s)
+			{
+				expr = new Regex(string.Format("^{0}$", s),
+								RegexOptions.CultureInvariant | RegexOptions.Compiled | RegexOptions.Singleline);
+			}
+			public override bool IsMatch(string str)
+			{
+				return expr.IsMatch(str);
+			}
+		}
 	}
 
 	static Testing[] FindTesting(IList<string> filters)
@@ -91,6 +137,7 @@ static class TestCase
 		}
 		List<Testing> actions = new List<Testing>();
 		Dictionary<string, List<Action>> prepares = new Dictionary<string, List<Action>>();
+		Dictionary<Action, int> preparespri = new Dictionary<Action, int>();
 		foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
 		{
 			foreach (Type type in assembly.GetTypes())
@@ -128,7 +175,7 @@ static class TestCase
 										throw new ApplicationException(string.Format("{0}.{1}:{2}", type.FullName, method.Name, e.Message));
 									}
 								}
-								actions.Add(new Testing {Name = attr.Name, Action = action});
+								actions.Add(new Testing { Name = attr.Name, Path = string.Format("{0}.{1}", type.FullName, method.Name), Action = action });
 								break;
 							}
 						}
@@ -145,6 +192,7 @@ static class TestCase
 									prepares.Add(attr_.Name, actions_);
 								}
 								actions_.Add(action);
+								preparespri[action] = attr_.Priority;
 								break;
 							}
 							catch (Exception e)
@@ -156,13 +204,17 @@ static class TestCase
 				}
 			}
 		}
-		List<Tuple<Regex, Action[]>> prepares_ = new List<Tuple<Regex, Action[]>>();
+		List<Tuple<Matcher, Action[]>> prepares_ = new List<Tuple<Matcher, Action[]>>();
 		Action[] empty_ = new Action[0];
 		foreach (var prepare in prepares)
 		{
-			prepares_.Add(Tuple.Create(new Regex(string.Format("^{0}$", prepare.Key), RegexOptions.CultureInvariant | RegexOptions.Compiled | RegexOptions.Singleline), prepare.Value == null ? empty_ : prepare.Value.ToArray()));
+			prepares_.Add(Tuple.Create(Matcher.Create(prepare.Key), prepare.Value == null ? empty_ : prepare.Value.ToArray()));
 		}
 		List<Action> list_ = new List<Action>();
+		Comparison<Action> compare_ = (action1, action2) =>
+		{
+			return preparespri[action2] - preparespri[action1];
+		};
 		for (int i = 0; i < actions.Count; ++i)
 		{
 			Testing testing = actions[i];
@@ -174,6 +226,7 @@ static class TestCase
 					list_.AddRange(tuple.Item2);
 				}
 			}
+			list_.Sort(compare_);
 			testing.Prepares = list_.ToArray();
 			list_.Clear();
 			actions[i] = testing;
@@ -196,28 +249,24 @@ static class TestCase
 			Console.WriteLine(e.Message);
 			return;
 		}
-		HashSet<Action> prepares = new HashSet<Action>();
-		Stopwatch sw = new Stopwatch();
+		Stopwatch timer = new Stopwatch();
 		GC.Collect();
 		for (int i = 0; i < testings.Length; ++i)
 		{
-			GC.Collect();
 			Testing testing = testings[i];
-			Console.WriteLine("--------TestCase {0} Enter", testing.Name);
+			Console.WriteLine("--------TestCase {0} Enter", string.IsNullOrEmpty(testing.Name) ? testing.Path : testing.Name);
 			try
 			{
 				for (int j = 0; j < testing.Prepares.Length; ++j)
 				{
 					Action action = testing.Prepares[j];
-					if (!prepares.Contains(action))
-					{
-						action();
-						prepares.Add(action);
-					}
+					action();
 				}
-				sw.Restart();
+				Thread.Sleep(10);
+				GC.Collect();
+				timer.Restart();
 				testing.Action(options.Count);
-				sw.Stop();
+				timer.Stop();
 			}
 			catch (Exception e)
 			{
@@ -228,11 +277,11 @@ static class TestCase
 			}
 			if ((options.Performance.HasValue && options.Performance.Value) || (!options.Performance.HasValue && options.Count > 1))
 			{
-				Console.WriteLine("--------TestCase {0} Exit, Cost {1} ms", testing.Name, sw.ElapsedMilliseconds);
+				Console.WriteLine("--------TestCase {0} Exit, Cost {1} ms", string.IsNullOrEmpty(testing.Name) ? testing.Path : testing.Name, timer.ElapsedMilliseconds);
 			}
 			else
 			{
-				Console.WriteLine("--------TestCase {0} Exit", testing.Name);
+				Console.WriteLine("--------TestCase {0} Exit", string.IsNullOrEmpty(testing.Name) ? testing.Path : testing.Name);
 			}
 		}
 	}
