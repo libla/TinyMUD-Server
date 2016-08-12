@@ -18,6 +18,18 @@ public class TestAttribute : Attribute
 	}
 }
 
+[AttributeUsage(AttributeTargets.Method)]
+public class PreTestAttribute : Attribute
+{
+	public string Name { get; private set; }
+
+	public PreTestAttribute() : this("") { }
+	public PreTestAttribute(string s)
+	{
+		Name = s;
+	}
+}
+
 static class TestCase
 {
 	class Options
@@ -52,13 +64,20 @@ static class TestCase
 			{
 				settings.CaseSensitive = false;
 				settings.IgnoreUnknownArguments = false;
-				settings.HelpWriter = System.Console.Out;
+				settings.HelpWriter = Console.Out;
 			});
 			return parser.ParseArguments(args, this);
 		}
 	}
 
-	static Tuple<string, Action<int>>[] FindTestCase(IList<string> filters)
+	struct Testing
+	{
+		public string Name;
+		public Action<int> Action;
+		public Action[] Prepares;
+	}
+
+	static Testing[] FindTesting(IList<string> filters)
 	{
 		Regex expr;
 		if (filters.Count == 0)
@@ -70,7 +89,8 @@ static class TestCase
 			string patterns = "^(" + string.Join(")|(", filters) + ")$";
 			expr = new Regex(patterns, RegexOptions.CultureInvariant | RegexOptions.Compiled | RegexOptions.Singleline);
 		}
-		List<Tuple<string, Action<int>>> actions = new List<Tuple<string, Action<int>>>();
+		List<Testing> actions = new List<Testing>();
+		Dictionary<string, List<Action>> prepares = new Dictionary<string, List<Action>>();
 		foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
 		{
 			foreach (Type type in assembly.GetTypes())
@@ -108,13 +128,46 @@ static class TestCase
 										throw new ApplicationException(string.Format("{0}.{1}:{2}", type.FullName, method.Name, e.Message));
 									}
 								}
-								actions.Add(Tuple.Create(attr.Name, action));
+								actions.Add(new Testing {Name = attr.Name, Action = action});
 								break;
+							}
+						}
+						PreTestAttribute attr_ = attrs[j] as PreTestAttribute;
+						if (attr_ != null)
+						{
+							try
+							{
+								Action action = Delegate.CreateDelegate(typeof(Action), method) as Action;
+								List<Action> actions_;
+								if (!prepares.TryGetValue(attr_.Name, out actions_))
+								{
+									actions_ = new List<Action>();
+									prepares.Add(attr_.Name, actions_);
+								}
+								actions_.Add(action);
+								break;
+							}
+							catch (Exception e)
+							{
+								throw new ApplicationException(string.Format("{0}.{1}:{2}", type.FullName, method.Name, e.Message));
 							}
 						}
 					}
 				}
 			}
+		}
+		Dictionary<string, Action[]> prepares_ = new Dictionary<string, Action[]>();
+		foreach (var prepare in prepares)
+		{
+			prepares_.Add(prepare.Key, prepare.Value.ToArray());
+		}
+		Action[] empty = new Action[0];
+		for (int i = 0; i < actions.Count; ++i)
+		{
+			Testing testing = actions[i];
+			if (!prepares_.TryGetValue(testing.Name, out testing.Prepares))
+				testing.Prepares = empty;
+			actions[i] = testing;
 		}
 		return actions.ToArray();
 	}
@@ -124,27 +177,37 @@ static class TestCase
 		Options options = new Options();
 		if (!options.Parse(args))
 			return;
-		Tuple<string, Action<int>>[] testcases;
+		Testing[] testings;
 		try
 		{
-			testcases = FindTestCase(options.Filters);
+			testings = FindTesting(options.Filters);
 		}
 		catch (Exception e)
 		{
 			Console.WriteLine(e.Message);
 			return;
 		}
+		HashSet<Action> prepares = new HashSet<Action>();
 		Stopwatch sw = new Stopwatch();
 		GC.Collect();
-		for (int i = 0; i < testcases.Length; ++i)
+		for (int i = 0; i < testings.Length; ++i)
 		{
 			GC.Collect();
-			var testcase = testcases[i];
-			Console.WriteLine("--------TestCase {0} Enter", testcase.Item1);
+			Testing testing = testings[i];
+			Console.WriteLine("--------TestCase {0} Enter", testing.Name);
 			try
 			{
+				for (int j = 0; j < testing.Prepares.Length; ++j)
+				{
+					Action action = testing.Prepares[j];
+					if (!prepares.Contains(action))
+					{
+						action();
+						prepares.Add(action);
+					}
+				}
 				sw.Restart();
-				testcase.Item2(options.Count);
+				testing.Action(options.Count);
 				sw.Stop();
 			}
 			catch (Exception e)
@@ -156,11 +219,11 @@ static class TestCase
 			}
 			if ((options.Performance.HasValue && options.Performance.Value) || (!options.Performance.HasValue && options.Count > 1))
 			{
-				Console.WriteLine("--------TestCase {0} Exit, Cost {1} ms", testcase.Item1, sw.ElapsedMilliseconds);
+				Console.WriteLine("--------TestCase {0} Exit, Cost {1} ms", testing.Name, sw.ElapsedMilliseconds);
 			}
 			else
 			{
-				Console.WriteLine("--------TestCase {0} Exit", testcase.Item1);
+				Console.WriteLine("--------TestCase {0} Exit", testing.Name);
 			}
 		}
 	}
