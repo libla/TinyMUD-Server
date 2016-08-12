@@ -156,17 +156,26 @@ static class TestCase
 				}
 			}
 		}
-		Dictionary<string, Action[]> prepares_ = new Dictionary<string, Action[]>();
+		List<Tuple<Regex, Action[]>> prepares_ = new List<Tuple<Regex, Action[]>>();
+		Action[] empty_ = new Action[0];
 		foreach (var prepare in prepares)
 		{
-			prepares_.Add(prepare.Key, prepare.Value.ToArray());
+			prepares_.Add(Tuple.Create(new Regex(string.Format("^{0}$", prepare.Key), RegexOptions.CultureInvariant | RegexOptions.Compiled | RegexOptions.Singleline), prepare.Value == null ? empty_ : prepare.Value.ToArray()));
 		}
-		Action[] empty = new Action[0];
+		List<Action> list_ = new List<Action>();
 		for (int i = 0; i < actions.Count; ++i)
 		{
 			Testing testing = actions[i];
-			if (!prepares_.TryGetValue(testing.Name, out testing.Prepares))
-				testing.Prepares = empty;
+			for (int j = 0; j < prepares_.Count; ++j)
+			{
+				var tuple = prepares_[j];
+				if (tuple.Item1.IsMatch(testing.Name))
+				{
+					list_.AddRange(tuple.Item2);
+				}
+			}
+			testing.Prepares = list_.ToArray();
+			list_.Clear();
 			actions[i] = testing;
 		}
 		return actions.ToArray();
