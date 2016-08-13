@@ -195,8 +195,13 @@ namespace TinyMUD
 				if (high != (int)TypeTag.String)
 					throw new SerializationException();
 				int low = token & 0x0f;
+				if (low == 0)
+				{
+					Step();
+					return "";
+				}
 				uint u = 0;
-				for (int i = 0; i < low + 1; ++i)
+				for (int i = 0; i < low; ++i)
 				{
 					u = ((uint)Next() << (i * 8)) | u;
 				}
@@ -395,28 +400,33 @@ namespace TinyMUD
 
 			protected override void WriteString(string s)
 			{
-				if (s == null)
-					s = "";
-				CheckStringBuffer(s.Length * 3);
-				int len = Encoding.UTF8.GetBytes(s, 0, s.Length, stringbuffer, 0);
-				int low;
-				if (len <= 1 << 8)
-					low = 1;
-				else if (len <= 1 << 16)
-					low = 2;
-				else if (len <= 1 << 24)
-					low = 3;
-				else
-					low = 4;
-				int high = (int)TypeTag.String << 4;
-				stream.WriteByte((byte)(high | (low - 1)));
-				uint u = (uint)len;
-				for (int i = 0; i < low; ++i)
+				if (string.IsNullOrEmpty(s))
 				{
-					stream.WriteByte((byte)(u & 0xff));
-					u >>= 8;
+					stream.WriteByte((int)TypeTag.String << 4);
 				}
-				stream.WriteBytes(stringbuffer, 0, len);
+				else
+				{
+					CheckStringBuffer(s.Length * 3);
+					int len = Encoding.UTF8.GetBytes(s, 0, s.Length, stringbuffer, 0);
+					int low;
+					if (len <= 1 << 8)
+						low = 1;
+					else if (len <= 1 << 16)
+						low = 2;
+					else if (len <= 1 << 24)
+						low = 3;
+					else
+						low = 4;
+					int high = (int)TypeTag.String << 4;
+					stream.WriteByte((byte)(high | low));
+					uint u = (uint)len;
+					for (int i = 0; i < low; ++i)
+					{
+						stream.WriteByte((byte)(u & 0xff));
+						u >>= 8;
+					}
+					stream.WriteBytes(stringbuffer, 0, len);
+				}
 			}
 
 			protected override void PrepareWrite(Stream stream)
