@@ -253,6 +253,8 @@ static class TestCase
 		GC.Collect();
 		for (int i = 0; i < testings.Length; ++i)
 		{
+			if (i != 0)
+				Console.WriteLine("================================================================");
 			Testing testing = testings[i];
 			Console.WriteLine("--------TestCase {0} Enter", string.IsNullOrEmpty(testing.Name) ? testing.Path : testing.Name);
 			try
