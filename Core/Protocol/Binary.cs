@@ -256,7 +256,7 @@ namespace TinyMUD
 			#endregion
 
 			#region 写入处理实现
-			protected override void WriteTableOpen()
+			protected override void WriteTableOpen(Type type)
 			{
 				int high = (int)TypeTag.Object << 4;
 				stream.WriteByte((byte)high);

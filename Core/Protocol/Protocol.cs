@@ -14,19 +14,22 @@ namespace TinyMUD
 		}
 
 		private static readonly Dictionary<Type, Dictionary<int, string>> AllKeys = new Dictionary<Type, Dictionary<int, string>>();
-		public static string NameOfKey<T>(int key) where T : Value, new()
+		public static string NameOfKey(Type type, int key)
 		{
 			Dictionary<int, string> names;
-			if (!AllKeys.TryGetValue(typeof(T), out names))
+			if (!AllKeys.TryGetValue(type, out names))
 			{
-				KeyValuePair<int, string>[] keys = new T().Keys();
+				Value value = Activator.CreateInstance(type) as Value;
+				if (value == null)
+					throw new ArgumentException();
+				KeyValuePair<int, string>[] keys = value.Keys();
 				names = new Dictionary<int, string>(keys.Length);
 				for (int i = 0; i < keys.Length; ++i)
 				{
 					var kv = keys[i];
 					names[kv.Key] = kv.Value;
 				}
-				AllKeys.Add(typeof(T), names);
+				AllKeys.Add(type, names);
 			}
 			string result;
 			if (!names.TryGetValue(key, out result))
@@ -73,7 +76,7 @@ namespace TinyMUD
 			#endregion
 
 			#region 重载写入处理
-			protected virtual void WriteTableOpen() { }
+			protected virtual void WriteTableOpen(Type type) { }
 			protected virtual void WriteTableNext() { }
 			protected virtual void WriteTableClose() { }
 			protected virtual void WriteArrayOpen() { }
@@ -530,7 +533,7 @@ namespace TinyMUD
 
 			private void WriteValue<T>(T t) where T : Value
 			{
-				WriteTableOpen();
+				WriteTableOpen(typeof(T));
 				empty.Push(true);
 				t.Write(this);
 				empty.Pop();

@@ -415,7 +415,7 @@ namespace TinyMUD
 			#endregion
 
 			#region 写入处理实现
-			protected override void WriteTableOpen()
+			protected override void WriteTableOpen(Type type)
 			{
 				stream.WriteByte((byte)'{');
 			}
