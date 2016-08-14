@@ -173,7 +173,7 @@ namespace TinyMUD
 				{
 					_timer = new Loop.Timer(_settings.timeout, false, () =>
 					{
-						int dtime = (int)(Application.Now - _alivetime / 1000);
+						int dtime = (int)((Application.Now - _alivetime) / 1000);
 						if (dtime >= _settings.timeout)
 						{
 							Close();
