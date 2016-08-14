@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 
@@ -346,6 +347,59 @@ namespace TinyMUD
 			});
 		}
 
+		public Task Wait(int time)
+		{
+			TaskCompletionSource<object> source = new TaskCompletionSource<object>();
+			Timer timer = new Timer(time, false, () =>
+			{
+				source.TrySetResult(null);
+			});
+			timer.Start();
+			return source.Task;
+		}
+
+		public Task Wait(Task task)
+		{
+			Loop loop = Current;
+			TaskCompletionSource<object> source = new TaskCompletionSource<object>();
+			loop.Retain();
+			task.GetAwaiter().OnCompleted(() =>
+			{
+				loop.Execute(() =>
+				{
+					if (task.IsCompleted)
+						source.TrySetResult(null);
+					else if (task.IsCanceled)
+						source.TrySetCanceled();
+					else
+						source.TrySetException(task.Exception);
+				});
+				loop.Release();
+			});
+			return source.Task;
+		}
+
+		public Task<T> Wait<T>(Task<T> task)
+		{
+			Loop loop = Current;
+			TaskCompletionSource<T> source = new TaskCompletionSource<T>();
+			loop.Retain();
+			task.GetAwaiter().OnCompleted(() =>
+			{
+				loop.Execute(() =>
+				{
+					if (task.IsCompleted)
+						source.TrySetResult(task.Result);
+					else if (task.IsCanceled)
+						source.TrySetCanceled();
+					else
+						source.TrySetException(task.Exception);
+				});
+				loop.Release();
+			});
+			return source.Task;
+		}
+
 		public void Link<T>(string msg, Action<T> action) where T : Event
 		{
 			eventsAsync.AddOrUpdate(new EventAction
@@ -455,6 +509,8 @@ namespace TinyMUD
 				expireTimerActions.Clear();
 				if (timeout == 0)
 				{
+					if (taskCount == 0 && actions.Count == 0)
+						break;
 					signal.WaitOne(Timeout.Infinite);
 				}
 				else
