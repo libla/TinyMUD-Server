@@ -9,14 +9,40 @@ namespace TinyMUD
 		public interface Value
 		{
 			void Read(Format format, int key);
-			IEnumerator<Action<Format>> Write();
+			void Write(Format format);
+			KeyValuePair<int, string>[] Keys();
+		}
+
+		private static readonly Dictionary<Type, Dictionary<int, string>> AllKeys = new Dictionary<Type, Dictionary<int, string>>();
+		public static string NameOfKey<T>(int key) where T : Value, new()
+		{
+			Dictionary<int, string> names;
+			if (!AllKeys.TryGetValue(typeof(T), out names))
+			{
+				KeyValuePair<int, string>[] keys = new T().Keys();
+				names = new Dictionary<int, string>(keys.Length);
+				for (int i = 0; i < keys.Length; ++i)
+				{
+					var kv = keys[i];
+					names[kv.Key] = kv.Value;
+				}
+				AllKeys.Add(typeof(T), names);
+			}
+			string result;
+			if (!names.TryGetValue(key, out result))
+			{
+				result = string.Format("~unknown({0})", key);
+				names.Add(key, result);
+			}
+			return result;
 		}
 
 		public abstract class Format
 		{
+			private readonly Stack<bool> empty = new Stack<bool>();
 			private readonly HashSet<object> writed = new HashSet<object>();
 
-			public T Load<T>(Stream stream) where T : Value, new()
+			public T Read<T>(Stream stream) where T : Value, new()
 			{
 				PrepareRead(stream);
 				T t = new T();
@@ -25,7 +51,7 @@ namespace TinyMUD
 				return t;
 			}
 
-			public void Print<T>(Stream stream, T t) where T : Value
+			public void Write<T>(Stream stream, T t) where T : Value
 			{
 				writed.Clear();
 				PrepareWrite(stream);
@@ -47,8 +73,12 @@ namespace TinyMUD
 			#endregion
 
 			#region 重载写入处理
-			protected abstract void WriteTable(Cursor cursor);
-			protected abstract void WriteArray(Cursor cursor);
+			protected virtual void WriteTableOpen() { }
+			protected virtual void WriteTableNext() { }
+			protected virtual void WriteTableClose() { }
+			protected virtual void WriteArrayOpen() { }
+			protected virtual void WriteArrayNext() { }
+			protected virtual void WriteArrayClose() { }
 			protected abstract void WriteKey(int key);
 			protected abstract void WriteBool(bool b);
 			protected abstract void WriteInt(int i);
@@ -152,7 +182,6 @@ namespace TinyMUD
 			#endregion
 
 			#region 读取字段
-
 			public void ReadValue<T>(ref T t) where T : Value
 			{
 				HandlerAction<T> handleract = Pool<HandlerAction<T>>.Default.Acquire();
@@ -162,9 +191,23 @@ namespace TinyMUD
 				Pool<HandlerAction<T>>.Default.Release(handleract);
 			}
 
+			public void ReadValue<T>(ref T? t) where T : struct, Value
+			{
+				T tt = default(T);
+				ReadValue(ref tt);
+				t = tt;
+			}
+
 			public void ReadValue(ref bool b)
 			{
 				b = ReadBool();
+			}
+
+			public void ReadValue(ref bool? b)
+			{
+				bool bb = default(bool);
+				ReadValue(ref bb);
+				b = bb;
 			}
 
 			public void ReadValue(ref int i)
@@ -172,9 +215,23 @@ namespace TinyMUD
 				i = ReadInt();
 			}
 
+			public void ReadValue(ref int? i)
+			{
+				int ii = default(int);
+				ReadValue(ref ii);
+				i = ii;
+			}
+
 			public void ReadValue(ref double d)
 			{
 				d = ReadFloat();
+			}
+
+			public void ReadValue(ref double? d)
+			{
+				double dd = default(double);
+				ReadValue(ref dd);
+				d = dd;
 			}
 
 			public void ReadValue(ref string s)
@@ -298,493 +355,186 @@ namespace TinyMUD
 			}
 			#endregion
 
-			#region 迭代写入接口
-			protected interface Cursor
-			{
-				bool MoveNext();
-				void Execute(Format format);
-			}
-
-			private class TableCursor : Cursor
-			{
-				public IEnumerator<Action<Format>> enumerator;
-
-				public bool MoveNext()
-				{
-					if (!enumerator.MoveNext())
-						return false;
-					while (enumerator.Current == null)
-					{
-						if (!enumerator.MoveNext())
-							return false;
-					}
-					return true;
-				}
-
-				public void Execute(Format format)
-				{
-					enumerator.Current(format);
-				}
-			}
-
-			private class ArrayCursor<T> : Cursor where T : Value
-			{
-				public IList<T> list;
-				public int index;
-
-				public void Reset(IList<T> list)
-				{
-					this.list = list;
-					this.index = 0;
-				}
-
-				public bool MoveNext()
-				{
-					if (index >= list.Count)
-						return false;
-					++index;
-					return true;
-				}
-
-				public void Execute(Format format)
-				{
-					format.WriteValue(list[index - 1]);
-				}
-			}
-
-			private class BoolArrayCursor : Cursor
-			{
-				public IList<bool> list;
-				public int index;
-
-				public void Reset(IList<bool> list)
-				{
-					this.list = list;
-					this.index = 0;
-				}
-
-				public bool MoveNext()
-				{
-					if (index >= list.Count)
-						return false;
-					++index;
-					return true;
-				}
-
-				public void Execute(Format format)
-				{
-					format.WriteValue(list[index - 1]);
-				}
-			}
-
-			private class IntArrayCursor : Cursor
-			{
-				public IList<int> list;
-				public int index;
-
-				public void Reset(IList<int> list)
-				{
-					this.list = list;
-					this.index = 0;
-				}
-
-				public bool MoveNext()
-				{
-					if (index >= list.Count)
-						return false;
-					++index;
-					return true;
-				}
-
-				public void Execute(Format format)
-				{
-					format.WriteValue(list[index - 1]);
-				}
-			}
-
-			private class FloatArrayCursor : Cursor
-			{
-				public IList<double> list;
-				public int index;
-
-				public void Reset(IList<double> list)
-				{
-					this.list = list;
-					this.index = 0;
-				}
-
-				public bool MoveNext()
-				{
-					if (index >= list.Count)
-						return false;
-					++index;
-					return true;
-				}
-
-				public void Execute(Format format)
-				{
-					format.WriteValue(list[index - 1]);
-				}
-			}
-
-			private class StringArrayCursor : Cursor
-			{
-				public IList<string> list;
-				public int index;
-
-				public void Reset(IList<string> list)
-				{
-					this.list = list;
-					this.index = 0;
-				}
-
-				public bool MoveNext()
-				{
-					if (index >= list.Count)
-						return false;
-					++index;
-					return true;
-				}
-
-				public void Execute(Format format)
-				{
-					format.WriteValue(list[index - 1]);
-				}
-			}
-			#endregion
-
-			#region 优化GC
-			private class KeyValue<T> where T : Value
-			{
-				public int key;
-				public T value;
-				public readonly Action<Format> action;
-
-				public KeyValue()
-				{
-					action = printer =>
-					{
-						printer.WriteKey(key);
-						printer.WriteValue(value);
-						Pool<KeyValue<T>>.Default.Release(this);
-					};
-				}
-			}
-
-			private class BoolKeyValue
-			{
-				public int key;
-				public bool value;
-				public readonly Action<Format> action;
-
-				public BoolKeyValue()
-				{
-					action = printer =>
-					{
-						printer.WriteKey(key);
-						printer.WriteValue(value);
-						Pool<BoolKeyValue>.Default.Release(this);
-					};
-				}
-			}
-
-			private class IntKeyValue
-			{
-				public int key;
-				public int value;
-				public readonly Action<Format> action;
-
-				public IntKeyValue()
-				{
-					action = printer =>
-					{
-						printer.WriteKey(key);
-						printer.WriteValue(value);
-						Pool<IntKeyValue>.Default.Release(this);
-					};
-				}
-			}
-
-			private class FloatKeyValue
-			{
-				public int key;
-				public double value;
-				public readonly Action<Format> action;
-
-				public FloatKeyValue()
-				{
-					action = printer =>
-					{
-						printer.WriteKey(key);
-						printer.WriteValue(value);
-						Pool<FloatKeyValue>.Default.Release(this);
-					};
-				}
-			}
-
-			private class StringKeyValue
-			{
-				public int key;
-				public string value;
-				public readonly Action<Format> action;
-
-				public StringKeyValue()
-				{
-					action = printer =>
-					{
-						printer.WriteKey(key);
-						printer.WriteValue(value);
-						Pool<StringKeyValue>.Default.Release(this);
-					};
-				}
-			}
-
-			private class ArrayKeyValue<T> where T : Value
-			{
-				public int key;
-				public IList<T> list;
-				public readonly Action<Format> action;
-
-				public ArrayKeyValue()
-				{
-					action = printer =>
-					{
-						printer.WriteKey(key);
-						printer.WriteValue(list);
-						list = null;
-						Pool<ArrayKeyValue<T>>.Default.Release(this);
-					};
-				}
-			}
-
-			private class BoolArrayKeyValue
-			{
-				public int key;
-				public IList<bool> list;
-				public readonly Action<Format> action;
-
-				public BoolArrayKeyValue()
-				{
-					action = printer =>
-					{
-						printer.WriteKey(key);
-						printer.WriteValue(list);
-						list = null;
-						Pool<BoolArrayKeyValue>.Default.Release(this);
-					};
-				}
-			}
-
-			private class IntArrayKeyValue
-			{
-				public int key;
-				public IList<int> list;
-				public readonly Action<Format> action;
-
-				public IntArrayKeyValue()
-				{
-					action = printer =>
-					{
-						printer.WriteKey(key);
-						printer.WriteValue(list);
-						list = null;
-						Pool<IntArrayKeyValue>.Default.Release(this);
-					};
-				}
-			}
-
-			private class FloatArrayKeyValue
-			{
-				public int key;
-				public IList<double> list;
-				public readonly Action<Format> action;
-
-				public FloatArrayKeyValue()
-				{
-					action = printer =>
-					{
-						printer.WriteKey(key);
-						printer.WriteValue(list);
-						list = null;
-						Pool<FloatArrayKeyValue>.Default.Release(this);
-					};
-				}
-			}
-
-			private class StringArrayKeyValue
-			{
-				public int key;
-				public IList<string> list;
-				public readonly Action<Format> action;
-
-				public StringArrayKeyValue()
-				{
-					action = printer =>
-					{
-						printer.WriteKey(key);
-						printer.WriteValue(list);
-						list = null;
-						Pool<StringArrayKeyValue>.Default.Release(this);
-					};
-				}
-			}
-			#endregion
-
 			#region 写入字段
-			public static Action<Format> WriteValue<T>(int key, T t) where T : Value
+			public void WriteValue<T>(int key, T t) where T : Value
 			{
 				if (t == null)
-					return null;
-				var kv = Pool<KeyValue<T>>.Default.Acquire();
-				kv.key = key;
-				kv.value = t;
-				return kv.action;
+					return;
+				CheckEmpty();
+				WriteKey(key);
+				WriteValue(t);
 			}
 
-			public static Action<Format> WriteValue(int key, bool b)
+			public void WriteValue<T>(int key, T? t) where T : struct, Value
 			{
-				var kv = Pool<BoolKeyValue>.Default.Acquire();
-				kv.key = key;
-				kv.value = b;
-				return kv.action;
+				if (t == null)
+					return;
+				WriteValue(key, t.Value);
 			}
 
-			public static Action<Format> WriteValue(int key, int i)
+			public void WriteValue(int key, bool b)
 			{
-				var kv = Pool<IntKeyValue>.Default.Acquire();
-				kv.key = key;
-				kv.value = i;
-				return kv.action;
+				CheckEmpty();
+				WriteKey(key);
+				WriteValue(b);
 			}
 
-			public static Action<Format> WriteValue(int key, double d)
+			public void WriteValue(int key, bool? b)
 			{
-				var kv = Pool<FloatKeyValue>.Default.Acquire();
-				kv.key = key;
-				kv.value = d;
-				return kv.action;
+				if (b == null)
+					return;
+				WriteValue(key, b.Value);
 			}
 
-			public static Action<Format> WriteValue(int key, string s)
+			public void WriteValue(int key, int i)
 			{
-				var kv = Pool<StringKeyValue>.Default.Acquire();
-				kv.key = key;
-				kv.value = s;
-				return kv.action;
+				CheckEmpty();
+				WriteKey(key);
+				WriteValue(i);
 			}
 
-			public static Action<Format> WriteValue<T>(int key, List<T> list) where T : Value
+			public void WriteValue(int key, int? i)
 			{
-				if (list == null || list.Count == 0)
-					return null;
-				var kv = Pool<ArrayKeyValue<T>>.Default.Acquire();
-				kv.key = key;
-				kv.list = list;
-				return kv.action;
+				if (i == null)
+					return;
+				WriteValue(key, i.Value);
 			}
 
-			public static Action<Format> WriteValue(int key, List<bool> list)
+			public void WriteValue(int key, double d)
 			{
-				if (list == null || list.Count == 0)
-					return null;
-				var kv = Pool<BoolArrayKeyValue>.Default.Acquire();
-				kv.key = key;
-				kv.list = list;
-				return kv.action;
+				CheckEmpty();
+				WriteKey(key);
+				WriteValue(d);
 			}
 
-			public static Action<Format> WriteValue(int key, List<int> list)
+			public void WriteValue(int key, double? d)
 			{
-				if (list == null || list.Count == 0)
-					return null;
-				var kv = Pool<IntArrayKeyValue>.Default.Acquire();
-				kv.key = key;
-				kv.list = list;
-				return kv.action;
+				if (d == null)
+					return;
+				WriteValue(key, d.Value);
 			}
 
-			public static Action<Format> WriteValue(int key, List<double> list)
+			public void WriteValue(int key, string s)
+			{
+				if (s == null)
+					return;
+				CheckEmpty();
+				WriteKey(key);
+				WriteValue(s);
+			}
+
+			public void WriteValue<T>(int key, List<T> list) where T : Value
 			{
 				if (list == null || list.Count == 0)
-					return null;
-				var kv = Pool<FloatArrayKeyValue>.Default.Acquire();
-				kv.key = key;
-				kv.list = list;
-				return kv.action;
+					return;
+				CheckEmpty();
+				WriteKey(key);
+				WriteValue((IList<T>)list);
 			}
 
-			public static Action<Format> WriteValue(int key, List<string> list)
+			public void WriteValue(int key, List<bool> list)
 			{
 				if (list == null || list.Count == 0)
-					return null;
-				var kv = Pool<StringArrayKeyValue>.Default.Acquire();
-				kv.key = key;
-				kv.list = list;
-				return kv.action;
+					return;
+				CheckEmpty();
+				WriteKey(key);
+				WriteValue((IList<bool>)list);
 			}
 
-			public static Action<Format> WriteValue<T>(int key, T[] array) where T : Value
+			public void WriteValue(int key, List<int> list)
 			{
-				if (array == null || array.Length == 0)
-					return null;
-				var kv = Pool<ArrayKeyValue<T>>.Default.Acquire();
-				kv.key = key;
-				kv.list = array;
-				return kv.action;
+				if (list == null || list.Count == 0)
+					return;
+				CheckEmpty();
+				WriteKey(key);
+				WriteValue((IList<int>)list);
 			}
 
-			public static Action<Format> WriteValue(int key, bool[] array)
+			public void WriteValue(int key, List<double> list)
 			{
-				if (array == null || array.Length == 0)
-					return null;
-				var kv = Pool<BoolArrayKeyValue>.Default.Acquire();
-				kv.key = key;
-				kv.list = array;
-				return kv.action;
+				if (list == null || list.Count == 0)
+					return;
+				CheckEmpty();
+				WriteKey(key);
+				WriteValue((IList<double>)list);
 			}
 
-			public static Action<Format> WriteValue(int key, int[] array)
+			public void WriteValue(int key, List<string> list)
 			{
-				if (array == null || array.Length == 0)
-					return null;
-				var kv = Pool<IntArrayKeyValue>.Default.Acquire();
-				kv.key = key;
-				kv.list = array;
-				return kv.action;
+				if (list == null || list.Count == 0)
+					return;
+				CheckEmpty();
+				WriteKey(key);
+				WriteValue((IList<string>)list);
 			}
 
-			public static Action<Format> WriteValue(int key, double[] array)
+			public void WriteValue<T>(int key, T[] array) where T : Value
 			{
 				if (array == null || array.Length == 0)
-					return null;
-				var kv = Pool<FloatArrayKeyValue>.Default.Acquire();
-				kv.key = key;
-				kv.list = array;
-				return kv.action;
+					return;
+				CheckEmpty();
+				WriteKey(key);
+				WriteValue((IList<T>)array);
 			}
 
-			public static Action<Format> WriteValue(int key, string[] array)
+			public void WriteValue(int key, bool[] array)
 			{
 				if (array == null || array.Length == 0)
-					return null;
-				var kv = Pool<StringArrayKeyValue>.Default.Acquire();
-				kv.key = key;
-				kv.list = array;
-				return kv.action;
+					return;
+				CheckEmpty();
+				WriteKey(key);
+				WriteValue((IList<bool>)array);
+			}
+
+			public void WriteValue(int key, int[] array)
+			{
+				if (array == null || array.Length == 0)
+					return;
+				CheckEmpty();
+				WriteKey(key);
+				WriteValue((IList<int>)array);
+			}
+
+			public void WriteValue(int key, double[] array)
+			{
+				if (array == null || array.Length == 0)
+					return;
+				CheckEmpty();
+				WriteKey(key);
+				WriteValue((IList<double>)array);
+			}
+
+			public void WriteValue(int key, string[] array)
+			{
+				if (array == null || array.Length == 0)
+					return;
+				CheckEmpty();
+				WriteKey(key);
+				WriteValue((IList<string>)array);
 			}
 			#endregion
 
 			#region 写入字段真正实现
+			private void CheckEmpty()
+			{
+				if (empty.Peek())
+				{
+					empty.Pop();
+					empty.Push(false);
+				}
+				else
+				{
+					WriteTableNext();
+				}
+			}
+
 			private void WriteValue<T>(T t) where T : Value
 			{
-				using (IEnumerator<Action<Format>> enumerator = t.Write())
-				{
-					TableCursor cursor = Pool<TableCursor>.Default.Acquire();
-					cursor.enumerator = enumerator;
-					WriteTable(cursor);
-					cursor.enumerator = null;
-					Pool<TableCursor>.Default.Release(cursor);
-				}
+				WriteTableOpen();
+				empty.Push(true);
+				t.Write(this);
+				empty.Pop();
+				WriteTableClose();
 			}
 
 			private void WriteValue(bool b)
@@ -804,7 +554,7 @@ namespace TinyMUD
 
 			private void WriteValue(string s)
 			{
-				WriteString(s ?? "");
+				WriteString(s);
 			}
 
 			private void WriteValue<T>(IList<T> list) where T : Value
@@ -812,47 +562,72 @@ namespace TinyMUD
 				if (writed.Contains(list))
 					throw new StackOverflowException();
 				writed.Add(list);
-				ArrayCursor<T> cursor = Pool<ArrayCursor<T>>.Default.Acquire();
-				cursor.Reset(list);
-				WriteArray(cursor);
-				cursor.Reset(null);
-				Pool<ArrayCursor<T>>.Default.Release(cursor);
+				WriteArrayOpen();
+				int count = list.Count;
+				if (count > 0)
+					WriteValue(list[0]);
+				for (int i = 1; i < count; ++i)
+				{
+					WriteArrayNext();
+					WriteValue(list[i]);
+				}
+				WriteArrayClose();
 			}
 
 			private void WriteValue(IList<bool> list)
 			{
-				BoolArrayCursor cursor = Pool<BoolArrayCursor>.Default.Acquire();
-				cursor.Reset(list);
-				WriteArray(cursor);
-				cursor.Reset(null);
-				Pool<BoolArrayCursor>.Default.Release(cursor);
+				WriteArrayOpen();
+				int count = list.Count;
+				if (count > 0)
+					WriteValue(list[0]);
+				for (int i = 1; i < count; ++i)
+				{
+					WriteArrayNext();
+					WriteValue(list[i]);
+				}
+				WriteArrayClose();
 			}
 
 			private void WriteValue(IList<int> list)
 			{
-				IntArrayCursor cursor = Pool<IntArrayCursor>.Default.Acquire();
-				cursor.Reset(list);
-				WriteArray(cursor);
-				cursor.Reset(null);
-				Pool<IntArrayCursor>.Default.Release(cursor);
+				WriteArrayOpen();
+				int count = list.Count;
+				if (count > 0)
+					WriteValue(list[0]);
+				for (int i = 1; i < count; ++i)
+				{
+					WriteArrayNext();
+					WriteValue(list[i]);
+				}
+				WriteArrayClose();
 			}
 
 			private void WriteValue(IList<double> list)
 			{
-				FloatArrayCursor cursor = Pool<FloatArrayCursor>.Default.Acquire();
-				cursor.Reset(list);
-				WriteArray(cursor);
-				cursor.Reset(null);
-				Pool<FloatArrayCursor>.Default.Release(cursor);
+				WriteArrayOpen();
+				int count = list.Count;
+				if (count > 0)
+					WriteValue(list[0]);
+				for (int i = 1; i < count; ++i)
+				{
+					WriteArrayNext();
+					WriteValue(list[i]);
+				}
+				WriteArrayClose();
 			}
 
 			private void WriteValue(IList<string> list)
 			{
-				StringArrayCursor cursor = Pool<StringArrayCursor>.Default.Acquire();
-				cursor.Reset(list);
-				WriteArray(cursor);
-				cursor.Reset(null);
-				Pool<StringArrayCursor>.Default.Release(cursor);
+				WriteArrayOpen();
+				int count = list.Count;
+				if (count > 0)
+					WriteValue(list[0]);
+				for (int i = 1; i < count; ++i)
+				{
+					WriteArrayNext();
+					WriteValue(list[i]);
+				}
+				WriteArrayClose();
 			}
 			#endregion
 		}

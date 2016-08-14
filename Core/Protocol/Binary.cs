@@ -256,37 +256,27 @@ namespace TinyMUD
 			#endregion
 
 			#region 写入处理实现
-			protected override void WriteTable(Cursor cursor)
+			protected override void WriteTableOpen()
 			{
 				int high = (int)TypeTag.Object << 4;
 				stream.WriteByte((byte)high);
-				bool result = cursor.MoveNext();
-				if (result)
-				{
-					cursor.Execute(this);
-					while (cursor.MoveNext())
-					{
-						cursor.Execute(this);
-					}
-				}
-				high = (int)TypeTag.End << 4;
+			}
+
+			protected override void WriteTableClose()
+			{
+				int high = (int)TypeTag.End << 4;
 				stream.WriteByte((byte)high);
 			}
 
-			protected override void WriteArray(Cursor cursor)
+			protected override void WriteArrayOpen()
 			{
 				int high = (int)TypeTag.Array << 4;
 				stream.WriteByte((byte)high);
-				bool result = cursor.MoveNext();
-				if (result)
-				{
-					cursor.Execute(this);
-					while (cursor.MoveNext())
-					{
-						cursor.Execute(this);
-					}
-				}
-				high = (int)TypeTag.End << 4;
+			}
+
+			protected override void WriteArrayClose()
+			{
+				int high = (int)TypeTag.End << 4;
 				stream.WriteByte((byte)high);
 			}
 

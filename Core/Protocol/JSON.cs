@@ -415,35 +415,33 @@ namespace TinyMUD
 			#endregion
 
 			#region 写入处理实现
-			protected override void WriteTable(Cursor cursor)
+			protected override void WriteTableOpen()
 			{
 				stream.WriteByte((byte)'{');
-				bool result = cursor.MoveNext();
-				if (result)
-				{
-					cursor.Execute(this);
-					while (cursor.MoveNext())
-					{
-						stream.WriteByte((byte)',');
-						cursor.Execute(this);
-					}
-				}
+			}
+
+			protected override void WriteTableNext()
+			{
+				stream.WriteByte((byte)',');
+			}
+
+			protected override void WriteTableClose()
+			{
 				stream.WriteByte((byte)'}');
 			}
 
-			protected override void WriteArray(Cursor cursor)
+			protected override void WriteArrayOpen()
 			{
 				stream.WriteByte((byte)'[');
-				bool result = cursor.MoveNext();
-				if (result)
-				{
-					cursor.Execute(this);
-					while (cursor.MoveNext())
-					{
-						stream.WriteByte((byte)',');
-						cursor.Execute(this);
-					}
-				}
+			}
+
+			protected override void WriteArrayNext()
+			{
+				stream.WriteByte((byte)',');
+			}
+
+			protected override void WriteArrayClose()
+			{
 				stream.WriteByte((byte)']');
 			}
 

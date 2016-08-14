@@ -57,32 +57,6 @@ namespace TinyMUD
 			#endregion
 
 			#region 写入处理实现
-			protected override void WriteTable(Cursor cursor)
-			{
-				bool result = cursor.MoveNext();
-				if (result)
-				{
-					cursor.Execute(this);
-					while (cursor.MoveNext())
-					{
-						cursor.Execute(this);
-					}
-				}
-			}
-
-			protected override void WriteArray(Cursor cursor)
-			{
-				bool result = cursor.MoveNext();
-				if (result)
-				{
-					cursor.Execute(this);
-					while (cursor.MoveNext())
-					{
-						cursor.Execute(this);
-					}
-				}
-			}
-
 			protected override void WriteKey(int key)
 			{
 			}
