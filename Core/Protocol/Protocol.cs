@@ -10,6 +10,7 @@ namespace TinyMUD
 		{
 			void Read(Format format, int key);
 			void Write(Format format);
+			void Reset();
 			KeyValuePair<int, string>[] Keys();
 		}
 
@@ -49,6 +50,7 @@ namespace TinyMUD
 			{
 				PrepareRead(stream);
 				T t = new T();
+				t.Reset();
 				ReadValue(ref t);
 				FlushRead();
 				return t;
@@ -113,6 +115,7 @@ namespace TinyMUD
 					action = parser =>
 					{
 						T t = new T();
+						t.Reset();
 						parser.ReadValue(ref t);
 						list.Add(t);
 					};
