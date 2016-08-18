@@ -14,6 +14,38 @@ namespace TinyMUD
 			KeyValuePair<int, string>[] Keys();
 		}
 
+		public class Option<T> where T : struct
+		{
+			public T Value;
+
+			public static implicit operator T(Option<T> option)
+			{
+				return option.Value;
+			}
+
+			public static implicit operator Option<T>(T value)
+			{
+				Option<T> option = new Option<T> {Value = value};
+				return option;
+			}
+		}
+
+		public struct literal
+		{
+			public string Value;
+
+			public static implicit operator string(literal l)
+			{
+				return l.Value;
+			}
+
+			public static implicit operator literal(string s)
+			{
+				literal l = new literal { Value = s };
+				return l;
+			}
+		}
+
 		private static readonly Dictionary<Type, Dictionary<int, string>> AllKeys = new Dictionary<Type, Dictionary<int, string>>();
 		public static string NameOfKey(Type type, int key)
 		{
@@ -204,12 +236,26 @@ namespace TinyMUD
 				t = tt;
 			}
 
+			public void ReadValue<T>(ref Option<T> t) where T : struct, Value
+			{
+				T tt = default(T);
+				ReadValue(ref tt);
+				t = tt;
+			}
+
 			public void ReadValue(ref bool b)
 			{
 				b = ReadBool();
 			}
 
 			public void ReadValue(ref bool? b)
+			{
+				bool bb = default(bool);
+				ReadValue(ref bb);
+				b = bb;
+			}
+
+			public void ReadValue(ref Option<bool> b)
 			{
 				bool bb = default(bool);
 				ReadValue(ref bb);
@@ -228,6 +274,13 @@ namespace TinyMUD
 				i = ii;
 			}
 
+			public void ReadValue(ref Option<int> i)
+			{
+				int ii = default(int);
+				ReadValue(ref ii);
+				i = ii;
+			}
+
 			public void ReadValue(ref double d)
 			{
 				d = ReadFloat();
@@ -238,6 +291,18 @@ namespace TinyMUD
 				double dd = default(double);
 				ReadValue(ref dd);
 				d = dd;
+			}
+
+			public void ReadValue(ref Option<double> d)
+			{
+				double dd = default(double);
+				ReadValue(ref dd);
+				d = dd;
+			}
+
+			public void ReadValue(ref literal l)
+			{
+				l = ReadString();
 			}
 
 			public void ReadValue(ref string s)
@@ -378,6 +443,13 @@ namespace TinyMUD
 				WriteValue(key, t.Value);
 			}
 
+			public void WriteValue<T>(int key, Option<T> t) where T : struct, Value
+			{
+				if (t == null)
+					return;
+				WriteValue(key, t.Value);
+			}
+
 			public void WriteValue(int key, bool b)
 			{
 				CheckEmpty();
@@ -386,6 +458,13 @@ namespace TinyMUD
 			}
 
 			public void WriteValue(int key, bool? b)
+			{
+				if (b == null)
+					return;
+				WriteValue(key, b.Value);
+			}
+
+			public void WriteValue(int key, Option<bool> b)
 			{
 				if (b == null)
 					return;
@@ -406,6 +485,13 @@ namespace TinyMUD
 				WriteValue(key, i.Value);
 			}
 
+			public void WriteValue(int key, Option<int> i)
+			{
+				if (i == null)
+					return;
+				WriteValue(key, i.Value);
+			}
+
 			public void WriteValue(int key, double d)
 			{
 				CheckEmpty();
@@ -418,6 +504,20 @@ namespace TinyMUD
 				if (d == null)
 					return;
 				WriteValue(key, d.Value);
+			}
+
+			public void WriteValue(int key, Option<double> d)
+			{
+				if (d == null)
+					return;
+				WriteValue(key, d.Value);
+			}
+
+			public void WriteValue(int key, literal l)
+			{
+				CheckEmpty();
+				WriteKey(key);
+				WriteValue(l.Value);
 			}
 
 			public void WriteValue(int key, string s)
@@ -465,13 +565,13 @@ namespace TinyMUD
 				WriteValue((IList<double>)list);
 			}
 
-			public void WriteValue(int key, List<string> list)
+			public void WriteValue(int key, List<literal> list)
 			{
 				if (list == null || list.Count == 0)
 					return;
 				CheckEmpty();
 				WriteKey(key);
-				WriteValue((IList<string>)list);
+				WriteValue((IList<literal>)list);
 			}
 
 			public void WriteValue<T>(int key, T[] array) where T : Value
@@ -510,13 +610,13 @@ namespace TinyMUD
 				WriteValue((IList<double>)array);
 			}
 
-			public void WriteValue(int key, string[] array)
+			public void WriteValue(int key, literal[] array)
 			{
 				if (array == null || array.Length == 0)
 					return;
 				CheckEmpty();
 				WriteKey(key);
-				WriteValue((IList<string>)array);
+				WriteValue((IList<literal>)array);
 			}
 			#endregion
 
@@ -560,7 +660,7 @@ namespace TinyMUD
 
 			private void WriteValue(string s)
 			{
-				WriteString(s);
+				WriteString(s ?? "");
 			}
 
 			private void WriteValue<T>(IList<T> list) where T : Value
@@ -622,16 +722,16 @@ namespace TinyMUD
 				WriteArrayClose();
 			}
 
-			private void WriteValue(IList<string> list)
+			private void WriteValue(IList<literal> list)
 			{
 				WriteArrayOpen();
 				int count = list.Count;
 				if (count > 0)
-					WriteValue(list[0]);
+					WriteValue(list[0].Value);
 				for (int i = 1; i < count; ++i)
 				{
 					WriteArrayNext();
-					WriteValue(list[i]);
+					WriteValue(list[i].Value);
 				}
 				WriteArrayClose();
 			}
