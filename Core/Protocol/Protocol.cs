@@ -11,7 +11,7 @@ namespace TinyMUD
 			void Read(Format format, int key);
 			void Write(Format format);
 			void Reset();
-			KeyValuePair<int, string>[] Keys();
+			Dictionary<int, string> Keys();
 		}
 
 		public class Option<T> where T : struct
@@ -55,13 +55,7 @@ namespace TinyMUD
 				Value value = Activator.CreateInstance(type) as Value;
 				if (value == null)
 					throw new ArgumentException();
-				KeyValuePair<int, string>[] keys = value.Keys();
-				names = new Dictionary<int, string>(keys.Length);
-				for (int i = 0; i < keys.Length; ++i)
-				{
-					var kv = keys[i];
-					names[kv.Key] = kv.Value;
-				}
+				names = value.Keys();
 				AllKeys.Add(type, names);
 			}
 			string result;
