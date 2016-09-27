@@ -200,6 +200,10 @@ namespace TinyMUD
 		private readonly List<Action<Event>> eventActions;
 		private readonly ConcurrentDictionary<EventAction, bool> eventsAsync;
 
+		#region dummy类型
+		private struct Dummy { }
+		#endregion
+
 		private struct EventAction
 		{
 			public string Message;
@@ -349,10 +353,10 @@ namespace TinyMUD
 
 		public Task Wait(int time)
 		{
-			TaskCompletionSource<object> source = new TaskCompletionSource<object>();
+			TaskCompletionSource<Dummy> source = new TaskCompletionSource<Dummy>();
 			Timer timer = new Timer(time, false, () =>
 			{
-				source.TrySetResult(null);
+				source.TrySetResult(new Dummy());
 			});
 			timer.Start();
 			return source.Task;
@@ -361,14 +365,14 @@ namespace TinyMUD
 		public Task Wait(Task task)
 		{
 			Loop loop = Current;
-			TaskCompletionSource<object> source = new TaskCompletionSource<object>();
+			TaskCompletionSource<Dummy> source = new TaskCompletionSource<Dummy>();
 			loop.Retain();
 			task.GetAwaiter().OnCompleted(() =>
 			{
 				loop.Execute(() =>
 				{
 					if (task.IsCompleted)
-						source.TrySetResult(null);
+						source.TrySetResult(new Dummy());
 					else if (task.IsCanceled)
 						source.TrySetCanceled();
 					else
