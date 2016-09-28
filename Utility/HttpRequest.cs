@@ -11,7 +11,69 @@ namespace TinyMUD
 	public static class HttpRequest
 	{
 		private static readonly string DefaultUserAgent = "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.2; SV1; .NET CLR 1.1.4322; .NET CLR 2.0.50727)";
-		private static readonly RemoteCertificateValidationCallback CheckValidationResult = (sender, certificate, chain, errors) => true;
+
+		public interface Form
+		{
+			byte[] Value { get; }
+			bool HasValue { get; }
+		}
+
+		#region 预设Form类
+		public class ParamForm : Dictionary<string, string>, Form
+		{
+			private readonly Encoding encoding;
+
+			public ParamForm() : this(Encoding.UTF8) { }
+			public ParamForm(Encoding encoding)
+			{
+				this.encoding = encoding;
+			}
+
+			public ParamForm(IDictionary<string, string> dictionary) : this(dictionary, Encoding.UTF8) { }
+			public ParamForm(IDictionary<string, string> dictionary, Encoding encoding) : base(dictionary)
+			{
+				this.encoding = encoding;
+			}
+
+			public byte[] Value
+			{
+				get
+				{
+					StringBuilder buffer = new StringBuilder();
+					foreach (var kv in this)
+					{
+						buffer.AppendFormat(buffer.Length == 0 ? "{0}={1}" : "&{0}={1}", kv.Key, kv.Value);
+					}
+					return encoding.GetBytes(buffer.ToString());
+				}
+			}
+
+			public bool HasValue
+			{
+				get { return Count != 0; }
+			}
+		}
+
+		public class BytesForm : Form
+		{
+			private readonly byte[] bytes;
+
+			public BytesForm(byte[] bytes)
+			{
+				this.bytes = bytes;
+			}
+
+			public byte[] Value
+			{
+				get { return bytes; }
+			}
+
+			public bool HasValue
+			{
+				get { return bytes != null && bytes.Length != 0; }
+			}
+		}
+		#endregion
 
 		/// <summary>
 		/// 创建GET方式的HTTP请求
@@ -20,8 +82,8 @@ namespace TinyMUD
 		/// <param name="timeout">请求的超时时间</param>
 		/// <param name="userAgent">请求的客户端浏览器信息，可以为空</param>
 		/// <param name="cookies">随同HTTP请求发送的Cookie信息，如果不需要身份验证可以为空</param>
-		/// <returns></returns>
-		public static Task<HttpWebResponse> Get(string url, int? timeout = null, string userAgent = null, CookieCollection cookies = null)
+		public static Task<HttpWebResponse> Get(string url, int? timeout = null, string userAgent = null,
+												CookieCollection cookies = null)
 		{
 			if (string.IsNullOrEmpty(url))
 				throw new ArgumentNullException("url");
@@ -44,16 +106,17 @@ namespace TinyMUD
 			});
 		}
 
+		private static readonly RemoteCertificateValidationCallback CheckValidationResult = (sender, certificate, chain, errors) => true;
 		/// <summary>
 		/// 创建POST方式的HTTP请求
 		/// </summary>
 		/// <param name="url">请求的URL</param>
-		/// <param name="parameters">随同请求POST的参数名称及参数值字典</param>
+		/// <param name="form">随同请求POST的FORM</param>
 		/// <param name="timeout">请求的超时时间</param>
 		/// <param name="userAgent">请求的客户端浏览器信息，可以为空</param>
 		/// <param name="cookies">随同HTTP请求发送的Cookie信息，如果不需要身份验证可以为空</param>
-		/// <returns></returns>
-		public static Task<HttpWebResponse> Post(string url, IDictionary<string, string> parameters, int? timeout = null, string userAgent = null, CookieCollection cookies = null)
+		public static Task<HttpWebResponse> Post(string url, Form form, int? timeout = null, string userAgent = null,
+												CookieCollection cookies = null)
 		{
 			if (string.IsNullOrEmpty(url))
 				throw new ArgumentNullException("url");
@@ -83,12 +146,9 @@ namespace TinyMUD
 				request.CookieContainer.Add(cookies);
 			}
 			//如果需要POST数据
-			if (!(parameters == null || parameters.Count == 0))
+			if (form != null && form.HasValue)
 			{
-				StringBuilder buffer = new StringBuilder();
-				foreach (string key in parameters.Keys)
-					buffer.AppendFormat(buffer.Length == 0 ? "{0}={1}" : "&{0}={1}", key, parameters[key]);
-				byte[] data = Encoding.UTF8.GetBytes(buffer.ToString());
+				byte[] data = form.Value;
 				return request.GetRequestStreamAsync().ContinueWith(task1 =>
 				{
 					Stream stream = task1.Result;
