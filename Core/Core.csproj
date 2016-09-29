@@ -38,6 +38,8 @@
     <Reference Include="System.XML" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Database\Connection.cs" />
+    <Compile Include="Database\DataEntity.cs" />
     <Compile Include="Network\Request.cs" />
     <Compile Include="Network\Server.cs" />
     <Compile Include="Network\Session.cs" />
@@ -58,7 +60,6 @@
     <Compile Include="System\WeakTable.cs" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Database\" />
     <Folder Include="HTTP\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
