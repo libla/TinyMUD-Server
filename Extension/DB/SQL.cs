@@ -71,6 +71,7 @@ namespace TinyMUD.Extension
 							string str = null;
 							if (!key.Read(index, ref str))
 								throw new DataSet.TypeMismatchException();
+							str = str ?? "";
 							uint hash = xxHash.Compute(Encoding.UTF8.GetBytes(str));
 							return hash.ToString();
 						}
@@ -132,19 +133,11 @@ namespace TinyMUD.Extension
 						}
 					case DataSet.Type.String:
 						{
-							string str = null;
-							if (!column.Read(name, ref str))
-								throw new DataSet.TypeMismatchException();
-							uint hash = xxHash.Compute(Encoding.UTF8.GetBytes(str));
-							return hash.ToString();
+							return "error";
 						}
 					case DataSet.Type.Blob:
 						{
-							byte[] bytes = null;
-							if (!column.Read(name, ref bytes))
-								throw new DataSet.TypeMismatchException();
-							uint hash = xxHash.Compute(bytes);
-							return hash.ToString();
+							return "error";
 						}
 					}
 					throw new DataSet.TypeMismatchException();
@@ -202,6 +195,7 @@ namespace TinyMUD.Extension
 								string str = null;
 								if (!key.Read(index, ref str))
 									throw new DataSet.TypeMismatchException();
+								str = str ?? "";
 								uint hash = xxHash.Compute(Encoding.UTF8.GetBytes(str));
 								return hash.ToString();
 							}
@@ -250,19 +244,11 @@ namespace TinyMUD.Extension
 							}
 						case DataSet.Type.String:
 							{
-								string str = null;
-								if (!column.Read(name, ref str))
-									throw new DataSet.TypeMismatchException();
-								uint hash = xxHash.Compute(Encoding.UTF8.GetBytes(str));
-								return hash.ToString();
+								return "error";
 							}
 						case DataSet.Type.Blob:
 							{
-								byte[] bytes = null;
-								if (!column.Read(name, ref bytes))
-									throw new DataSet.TypeMismatchException();
-								uint hash = xxHash.Compute(bytes);
-								return hash.ToString();
+								return "error";
 							}
 						}
 					}
@@ -289,6 +275,7 @@ namespace TinyMUD.Extension
 					string str = null;
 					if (!key.Read(i, ref str))
 						throw new DataSet.TypeMismatchException();
+					str = str ?? "";
 					command.AddParam(str);
 				}
 				else if (type == DataSet.Type.Blob)
@@ -320,6 +307,7 @@ namespace TinyMUD.Extension
 					string str = null;
 					if (!column.Read(c.Key, ref str))
 						throw new DataSet.TypeMismatchException();
+					str = str ?? "";
 					command.AddParam(str);
 				}
 				else if (c.Value == DataSet.Type.Blob)
@@ -353,6 +341,7 @@ namespace TinyMUD.Extension
 					string str = null;
 					if (!key.Read(i, ref str))
 						throw new DataSet.TypeMismatchException();
+					str = str ?? "";
 					command.AddParam(str);
 				}
 				else if (type == DataSet.Type.Blob)
@@ -372,6 +361,7 @@ namespace TinyMUD.Extension
 					string str = null;
 					if (!column.Read(c.Key, ref str))
 						throw new DataSet.TypeMismatchException();
+					str = str ?? "";
 					command.AddParam(str);
 				}
 				else if (c.Value == DataSet.Type.Blob)
@@ -424,7 +414,7 @@ namespace TinyMUD.Extension
 					{
 						++index;
 						string result = reader.GetString(index);
-						if (!key.Write(i, result))
+						if (!key.Write(i, result ?? ""))
 							throw new DataSet.TypeMismatchException();
 					}
 					break;
@@ -485,7 +475,7 @@ namespace TinyMUD.Extension
 				case DataSet.Type.String:
 					{
 						string result = reader.GetString(index);
-						if (!column.Write(kv.Key, result))
+						if (!column.Write(kv.Key, result ?? ""))
 							throw new DataSet.TypeMismatchException();
 					}
 					break;

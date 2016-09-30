@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Reflection;
-using System.Reflection.Emit;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 
 namespace TinyMUD
 {
@@ -10,11 +10,17 @@ namespace TinyMUD
 		public class KeyAttribute : Attribute
 		{
 			public DataSet.Type? Type;
-			public readonly int Index;
+			public readonly uint Index;
 
-			public KeyAttribute(int index)
+			public KeyAttribute(uint index)
 			{
 				Index = index;
+			}
+
+			public KeyAttribute(uint index, DataSet.Type type)
+			{
+				Index = index;
+				Type = type;
 			}
 		}
 
@@ -22,74 +28,258 @@ namespace TinyMUD
 		{
 			public DataSet.Type? Type;
 			public readonly string Name;
+			public readonly bool Auto;
+
+			public ColumnAttribute()
+			{
+				Auto = true;
+			}
+
+			public ColumnAttribute(DataSet.Type type)
+			{
+				Auto = true;
+				Type = type;
+			}
 
 			public ColumnAttribute(string name)
 			{
 				Name = name;
+				Auto = false;
+			}
+
+			public ColumnAttribute(string name, DataSet.Type type)
+			{
+				Name = name;
+				Auto = false;
+				Type = type;
 			}
 		}
+
+		#region 非标准类型适配接口
+		public interface FormatBoolean
+		{
+			bool Value { get; set; }
+		}
+
+		public interface FormatInteger
+		{
+			int Value { get; set; }
+		}
+
+		public interface FormatLong
+		{
+			long Value { get; set; }
+		}
+
+		public interface FormatDouble
+		{
+			double Value { get; set; }
+		}
+
+		public interface FormatString
+		{
+			string Value { get; set; }
+		}
+
+		public interface FormatBytes
+		{
+			byte[] Value { get; set; }
+		}
+		#endregion
 
 		#region 实现DataSet.Key接口
 		public class Key : DataSet.Key
 		{
+			private Func<object, T> Getter<T>(int index)
+			{
+				MemberInfo[] memberInfos = GetKeys(GetType());
+				Delegate getter;
+				if (!getters.TryGetValue(memberInfos[index], out getter))
+				{
+					getter = getters.GetOrAdd(memberInfos[index], member =>
+					{
+						if (member.MemberType == MemberTypes.Field)
+							return CreateGetter<T>(member as FieldInfo);
+						if (member.MemberType == MemberTypes.Property)
+							return CreateGetter<T>(member as PropertyInfo);
+						throw new MissingFieldException(member.DeclaringType.FullName, member.Name);
+					});
+				}
+				return (Func<object, T>)getter;
+			}
+
+			private Action<object, T> Setter<T>(int index)
+			{
+				MemberInfo[] memberInfos = GetKeys(GetType());
+				Delegate setter;
+				if (!setters.TryGetValue(memberInfos[index], out setter))
+				{
+					setter = setters.GetOrAdd(memberInfos[index], member =>
+					{
+						if (member.MemberType == MemberTypes.Field)
+							return CreateSetter<T>(member as FieldInfo);
+						if (member.MemberType == MemberTypes.Property)
+							return CreateSetter<T>(member as PropertyInfo);
+						throw new MissingFieldException(member.DeclaringType.FullName, member.Name);
+					});
+				}
+				return (Action<object, T>)setter;
+			}
+
 			public bool Read(int index, ref bool b)
 			{
-				throw new NotImplementedException();
+				try
+				{
+					b = Getter<bool>(index)(this);
+					return true;
+				}
+				catch (Exception)
+				{
+					return false;
+				}
 			}
 
 			public bool Read(int index, ref int i)
 			{
-				throw new NotImplementedException();
+				try
+				{
+					i = Getter<int>(index)(this);
+					return true;
+				}
+				catch (Exception)
+				{
+					return false;
+				}
 			}
 
 			public bool Read(int index, ref long l)
 			{
-				throw new NotImplementedException();
+				try
+				{
+					l = Getter<long>(index)(this);
+					return true;
+				}
+				catch (Exception)
+				{
+					return false;
+				}
 			}
 
 			public bool Read(int index, ref double d)
 			{
-				throw new NotImplementedException();
+				try
+				{
+					d = Getter<double>(index)(this);
+					return true;
+				}
+				catch (Exception)
+				{
+					return false;
+				}
 			}
 
 			public bool Read(int index, ref string str)
 			{
-				throw new NotImplementedException();
+				try
+				{
+					str = Getter<string>(index)(this);
+					return true;
+				}
+				catch (Exception)
+				{
+					return false;
+				}
 			}
 
 			public bool Read(int index, ref byte[] bytes)
 			{
-				throw new NotImplementedException();
+				try
+				{
+					bytes = Getter<byte[]>(index)(this);
+					return true;
+				}
+				catch (Exception)
+				{
+					return false;
+				}
 			}
 
 			public bool Write(int index, bool b)
 			{
-				throw new NotImplementedException();
+				try
+				{
+					Setter<bool>(index)(this, b);
+					return true;
+				}
+				catch (Exception)
+				{
+					return false;
+				}
 			}
 
 			public bool Write(int index, int i)
 			{
-				throw new NotImplementedException();
+				try
+				{
+					Setter<int>(index)(this, i);
+					return true;
+				}
+				catch (Exception)
+				{
+					return false;
+				}
 			}
 
 			public bool Write(int index, long l)
 			{
-				throw new NotImplementedException();
+				try
+				{
+					Setter<long>(index)(this, l);
+					return true;
+				}
+				catch (Exception)
+				{
+					return false;
+				}
 			}
 
 			public bool Write(int index, double d)
 			{
-				throw new NotImplementedException();
+				try
+				{
+					Setter<double>(index)(this, d);
+					return true;
+				}
+				catch (Exception)
+				{
+					return false;
+				}
 			}
 
 			public bool Write(int index, string str)
 			{
-				throw new NotImplementedException();
+				try
+				{
+					Setter<string>(index)(this, str);
+					return true;
+				}
+				catch (Exception)
+				{
+					return false;
+				}
 			}
 
 			public bool Write(int index, byte[] bytes)
 			{
-				throw new NotImplementedException();
+				try
+				{
+					Setter<byte[]>(index)(this, bytes);
+					return true;
+				}
+				catch (Exception)
+				{
+					return false;
+				}
 			}
 		}
 		#endregion
@@ -97,213 +287,633 @@ namespace TinyMUD
 		#region 实现DataSet.Column接口
 		public class Column : DataSet.Column
 		{
+			private Func<object, T> Getter<T>(string name)
+			{
+				Dictionary<string, MemberInfo> memberInfos = GetColumns(GetType());
+				Delegate getter;
+				if (!getters.TryGetValue(memberInfos[name], out getter))
+				{
+					getter = getters.GetOrAdd(memberInfos[name], member =>
+					{
+						if (member.MemberType == MemberTypes.Field)
+							return CreateGetter<T>(member as FieldInfo);
+						if (member.MemberType == MemberTypes.Property)
+							return CreateGetter<T>(member as PropertyInfo);
+						throw new MissingFieldException(member.DeclaringType.FullName, member.Name);
+					});
+				}
+				return (Func<object, T>)getter;
+			}
+
+			private Action<object, T> Setter<T>(string name)
+			{
+				Dictionary<string, MemberInfo> memberInfos = GetColumns(GetType());
+				Delegate setter;
+				if (!setters.TryGetValue(memberInfos[name], out setter))
+				{
+					setter = setters.GetOrAdd(memberInfos[name], member =>
+					{
+						if (member.MemberType == MemberTypes.Field)
+							return CreateSetter<T>(member as FieldInfo);
+						if (member.MemberType == MemberTypes.Property)
+							return CreateSetter<T>(member as PropertyInfo);
+						throw new MissingFieldException(member.DeclaringType.FullName, member.Name);
+					});
+				}
+				return (Action<object, T>)setter;
+			}
+
 			public bool Read(string field, ref bool b)
 			{
-				throw new NotImplementedException();
+				try
+				{
+					b = Getter<bool>(field)(this);
+					return true;
+				}
+				catch (Exception)
+				{
+					return false;
+				}
 			}
 
 			public bool Read(string field, ref int i)
 			{
-				throw new NotImplementedException();
+				try
+				{
+					i = Getter<int>(field)(this);
+					return true;
+				}
+				catch (Exception)
+				{
+					return false;
+				}
 			}
 
 			public bool Read(string field, ref long l)
 			{
-				throw new NotImplementedException();
+				try
+				{
+					l = Getter<long>(field)(this);
+					return true;
+				}
+				catch (Exception)
+				{
+					return false;
+				}
 			}
 
 			public bool Read(string field, ref double d)
 			{
-				throw new NotImplementedException();
+				try
+				{
+					d = Getter<double>(field)(this);
+					return true;
+				}
+				catch (Exception)
+				{
+					return false;
+				}
 			}
 
 			public bool Read(string field, ref string str)
 			{
-				throw new NotImplementedException();
+				try
+				{
+					str = Getter<string>(field)(this);
+					return true;
+				}
+				catch (Exception)
+				{
+					return false;
+				}
 			}
 
 			public bool Read(string field, ref byte[] bytes)
 			{
-				throw new NotImplementedException();
+				try
+				{
+					bytes = Getter<byte[]>(field)(this);
+					return true;
+				}
+				catch (Exception e)
+				{
+					return false;
+				}
 			}
 
 			public bool Write(string field, bool b)
 			{
-				throw new NotImplementedException();
+				try
+				{
+					Setter<bool>(field)(this, b);
+					return true;
+				}
+				catch (Exception)
+				{
+					return false;
+				}
 			}
 
 			public bool Write(string field, int i)
 			{
-				throw new NotImplementedException();
+				try
+				{
+					Setter<int>(field)(this, i);
+					return true;
+				}
+				catch (Exception)
+				{
+					return false;
+				}
 			}
 
 			public bool Write(string field, long l)
 			{
-				throw new NotImplementedException();
+				try
+				{
+					Setter<long>(field)(this, l);
+					return true;
+				}
+				catch (Exception)
+				{
+					return false;
+				}
 			}
 
 			public bool Write(string field, double d)
 			{
-				throw new NotImplementedException();
+				try
+				{
+					Setter<double>(field)(this, d);
+					return true;
+				}
+				catch (Exception)
+				{
+					return false;
+				}
 			}
 
 			public bool Write(string field, string str)
 			{
-				throw new NotImplementedException();
+				try
+				{
+					Setter<string>(field)(this, str);
+					return true;
+				}
+				catch (Exception)
+				{
+					return false;
+				}
 			}
 
 			public bool Write(string field, byte[] bytes)
 			{
-				throw new NotImplementedException();
+				try
+				{
+					Setter<byte[]>(field)(this, bytes);
+					return true;
+				}
+				catch (Exception)
+				{
+					return false;
+				}
 			}
 		}
 		#endregion
 
-		#region OpCode表
-		private static readonly Dictionary<TypeCode, int> codes = new Dictionary<TypeCode, int>
+		public static DataSet.Define GetDefine<TKey, TColumn>(string name)
+			where TKey : Key
+			where TColumn : Column
 		{
-			{TypeCode.SByte, 0},
-			{TypeCode.Byte, 1},
-			{TypeCode.Int16, 2},
-			{TypeCode.UInt16, 3},
-			{TypeCode.Int32, 4},
-			{TypeCode.UInt32, 5},
-			{TypeCode.Int64, 6},
-			{TypeCode.UInt64, 7},
-			{TypeCode.Single, 8},
-			{TypeCode.Double, 9},
-		};
-
-		private static readonly OpCode[,] converts = {
-			/*    SByte            Byte             Int16           UInt16            Int32           UInt32            Int64           UInt64           Single           Double    */
-/*SByte*/	{OpCodes.Nop,     OpCodes.Conv_I1, OpCodes.Conv_I1, OpCodes.Conv_I1, OpCodes.Conv_I1, OpCodes.Conv_I1, OpCodes.Conv_I1, OpCodes.Conv_I1, OpCodes.Conv_I1, OpCodes.Conv_I1},
-/*Byte*/	{OpCodes.Conv_U1, OpCodes.Conv_U1, OpCodes.Conv_U1, OpCodes.Conv_U1, OpCodes.Conv_U1, OpCodes.Conv_U1, OpCodes.Conv_U1, OpCodes.Conv_U1, OpCodes.Conv_U1, OpCodes.Conv_U1},
-/*Int16*/	{OpCodes.Nop,     OpCodes.Nop,     OpCodes.Nop,     OpCodes.Conv_I2, OpCodes.Conv_I2, OpCodes.Conv_I2, OpCodes.Conv_I2, OpCodes.Conv_I2, OpCodes.Conv_I2, OpCodes.Conv_I2},
-/*UInt16*/	{OpCodes.Nop,     OpCodes.Nop,     OpCodes.Conv_U2, OpCodes.Nop,     OpCodes.Conv_U2, OpCodes.Conv_U2, OpCodes.Conv_U2, OpCodes.Conv_U2, OpCodes.Conv_U2, OpCodes.Conv_U2},
-/*Int32*/	{OpCodes.Nop,     OpCodes.Nop,     OpCodes.Nop,     OpCodes.Nop,     OpCodes.Nop,     OpCodes.Conv_I4, OpCodes.Conv_I4, OpCodes.Conv_I4, OpCodes.Conv_I4, OpCodes.Conv_I4},
-/*UInt32*/	{OpCodes.Nop,     OpCodes.Nop,     OpCodes.Nop,     OpCodes.Nop,     OpCodes.Conv_U4, OpCodes.Nop,     OpCodes.Conv_U4, OpCodes.Conv_U4, OpCodes.Conv_U4, OpCodes.Conv_U4},
-/*Int64*/	{OpCodes.Conv_I8, OpCodes.Conv_I8, OpCodes.Conv_I8, OpCodes.Conv_I8, OpCodes.Conv_I8, OpCodes.Conv_I8, OpCodes.Nop,     OpCodes.Conv_I8, OpCodes.Conv_I8, OpCodes.Conv_I8},
-/*UInt64*/	{OpCodes.Conv_U8, OpCodes.Conv_U8, OpCodes.Conv_U8, OpCodes.Conv_U8, OpCodes.Conv_U8, OpCodes.Conv_U8, OpCodes.Conv_U8, OpCodes.Nop,     OpCodes.Conv_U8, OpCodes.Conv_U8},
-/*Single*/	{OpCodes.Conv_R4, OpCodes.Conv_R4, OpCodes.Conv_R4, OpCodes.Conv_R4, OpCodes.Conv_R4, OpCodes.Conv_R4, OpCodes.Conv_R4, OpCodes.Conv_R4, OpCodes.Nop,     OpCodes.Conv_R4},
-/*Double*/	{OpCodes.Conv_R8, OpCodes.Conv_R8, OpCodes.Conv_R8, OpCodes.Conv_R8, OpCodes.Conv_R8, OpCodes.Conv_R8, OpCodes.Conv_R8, OpCodes.Conv_R8, OpCodes.Conv_R8, OpCodes.Nop},
-		};
-		#endregion
-
-		private static OpCode ConvertFrom(this TypeCode to, TypeCode from)
-		{
-			int index1;
-			if (!codes.TryGetValue(to, out index1))
-				return OpCodes.Throw;
-			int index2;
-			if (!codes.TryGetValue(from, out index2))
-				return OpCodes.Throw;
-			return converts[index1, index2];
-		}
-
-		private static Action<object, T> EmitSet<T>(FieldInfo field)
-		{
-			DynamicMethod dm = new DynamicMethod(string.Format("Set_{0}.{1}", field.DeclaringType.FullName, field.Name), typeof(void),
-												new Type[] { typeof(object), typeof(T) }, field.DeclaringType, true);
-			ILGenerator il = dm.GetILGenerator();
-			if (!field.DeclaringType.IsValueType)
+			DefineIndex index = new DefineIndex
 			{
-				il.Emit(OpCodes.Ldarg_0);
-				il.Emit(OpCodes.Ldarg_1);
-				if (field.FieldType != typeof(T))
+				Name = name,
+				Key = typeof(TKey),
+				Column = typeof(TColumn)
+			};
+			DataSet.Define define;
+			if (defines.TryGetValue(index, out define))
+				return define;
+			return defines.GetOrAdd(index, idx =>
+			{
+				DataSet.Define def = new DataSet.Define(idx.Name);
+				Dictionary<uint, DataSet.Type> keytypes = new Dictionary<uint, DataSet.Type>();
+				foreach (MemberInfo member in GetKeys(idx.Key))
 				{
-					if (!field.FieldType.IsAssignableFrom(typeof(T)))
+					foreach (Attribute attribute in member.GetCustomAttributes(false))
 					{
-						TypeCode code = Type.GetTypeCode(field.FieldType);
-						if (code == TypeCode.Boolean)
+						KeyAttribute keyattr = attribute as KeyAttribute;
+						if (keyattr != null)
 						{
-							switch (Type.GetTypeCode(field.FieldType))
+							if (keyattr.Type.HasValue)
 							{
-							case TypeCode.UInt64:
-							case TypeCode.Int64:
-								il.Emit(OpCodes.Ldc_I4_0);
-								il.Emit(OpCodes.Conv_I8);
-								break;
-							case TypeCode.SByte:
-							case TypeCode.Byte:
-							case TypeCode.Int16:
-							case TypeCode.UInt16:
-							case TypeCode.Int32:
-							case TypeCode.UInt32:
-								il.Emit(OpCodes.Ldc_I4_0);
-								break;
-							default:
-								throw new DataSet.TypeMismatchException();
+								keytypes.Add(keyattr.Index, keyattr.Type.Value);
 							}
-							il.Emit(OpCodes.Ceq);
-							il.Emit(OpCodes.Ldc_I4_0);
-							il.Emit(OpCodes.Ceq);
-						}
-						else
-						{
-							OpCode op = code.ConvertFrom(Type.GetTypeCode(typeof(T)));
-							if (op == OpCodes.Throw)
-								throw new DataSet.TypeMismatchException();
-							if (op != OpCodes.Nop)
-								il.Emit(op);
+							else
+							{
+								Type type = member.MemberType == MemberTypes.Field
+									? (member as FieldInfo).FieldType
+									: (member as PropertyInfo).PropertyType;
+								keytypes.Add(keyattr.Index, SelectType(type));
+							}
+							break;
 						}
 					}
 				}
-				il.Emit(OpCodes.Stfld, field);
-			}
-			il.Emit(OpCodes.Ret);
-			return (Action<object, T>)dm.CreateDelegate(typeof(Action<object, T>));
+				Dictionary<string, DataSet.Type> columntypes = new Dictionary<string, DataSet.Type>();
+				foreach (MemberInfo member in GetColumns(idx.Column).Values)
+				{
+					foreach (Attribute attribute in member.GetCustomAttributes(false))
+					{
+						ColumnAttribute columnattr = attribute as ColumnAttribute;
+						if (columnattr != null)
+						{
+							string columnname = columnattr.Auto ? member.Name : columnattr.Name;
+							if (columnattr.Type.HasValue)
+							{
+								columntypes.Add(columnname, columnattr.Type.Value);
+							}
+							else
+							{
+								Type type = member.MemberType == MemberTypes.Field
+									? (member as FieldInfo).FieldType
+									: (member as PropertyInfo).PropertyType;
+								columntypes.Add(columnname, SelectType(type));
+							}
+							break;
+						}
+					}
+				}
+				for (uint i = 0; i < keytypes.Count; ++i)
+				{
+					def.AddKey(keytypes[i]);
+				}
+				foreach (var kv in columntypes)
+				{
+					def.AddColumn(kv.Key, kv.Value);
+				}
+				return def;
+			});
 		}
 
-		private static Func<object, T> EmitGet<T>(FieldInfo field)
+		#region 自动根据字段类型确定数据类型
+		private static DataSet.Type SelectType(Type type)
 		{
-			DynamicMethod dm = new DynamicMethod(string.Format("Get_{0}.{1}", field.DeclaringType.FullName, field.Name), typeof(T),
-												new Type[] { typeof(object) }, field.DeclaringType, true);
-			ILGenerator il = dm.GetILGenerator();
-			il.Emit(OpCodes.Ldarg_0);
-			if (field.DeclaringType.IsValueType)
-				il.Emit(OpCodes.Unbox_Any, field.DeclaringType);
-			il.Emit(OpCodes.Ldfld, field);
-			if (field.FieldType != typeof(T))
+			DataSet.Type datatype = DataSet.Type.Blob;
+			switch (Type.GetTypeCode(type))
 			{
-				if (!typeof(T).IsAssignableFrom(field.FieldType))
+			case TypeCode.Boolean:
+				datatype = DataSet.Type.Bool;
+				break;
+			case TypeCode.SByte:
+			case TypeCode.Byte:
+			case TypeCode.Int16:
+			case TypeCode.UInt16:
+			case TypeCode.Int32:
+			case TypeCode.UInt32:
+				datatype = DataSet.Type.Integer;
+				break;
+			case TypeCode.Int64:
+			case TypeCode.UInt64:
+				datatype = DataSet.Type.Long;
+				break;
+			case TypeCode.Single:
+			case TypeCode.Double:
+			case TypeCode.Decimal:
+				datatype = DataSet.Type.Double;
+				break;
+			case TypeCode.Char:
+			case TypeCode.String:
+				datatype = DataSet.Type.String;
+				break;
+			}
+			return datatype;
+		}
+		#endregion
+
+		#region DataSet.Define内部缓存，以确保名字、Key、Column组合总是指向同一个DataSet.Define
+		private static readonly ConcurrentDictionary<DefineIndex, DataSet.Define> defines =
+			new ConcurrentDictionary<DefineIndex, DataSet.Define>(DefineIndexComparer.Default);
+
+		private struct DefineIndex
+		{
+			public string Name;
+			public Type Key;
+			public Type Column;
+		}
+
+		private class DefineIndexComparer : IEqualityComparer<DefineIndex>
+		{
+			private DefineIndexComparer() { }
+
+			public bool Equals(DefineIndex x, DefineIndex y)
+			{
+				return x.Name == y.Name && x.Key == y.Key && x.Column == y.Column;
+			}
+
+			public int GetHashCode(DefineIndex obj)
+			{
+				return obj.Name.GetHashCode() ^ obj.Key.GetHashCode() ^ obj.Column.GetHashCode();
+			}
+
+			public static readonly DefineIndexComparer Default = new DefineIndexComparer();
+		}
+		#endregion
+
+		#region 遍历Type的字段属性
+		private static readonly ConcurrentDictionary<Type, MemberInfo[]> keys =
+				new ConcurrentDictionary<Type, MemberInfo[]>();
+		private static readonly ConcurrentDictionary<Type, Dictionary<string, MemberInfo>> columns =
+				new ConcurrentDictionary<Type, Dictionary<string, MemberInfo>>();
+		private static readonly ConcurrentDictionary<MemberInfo, Delegate> getters =
+				new ConcurrentDictionary<MemberInfo, Delegate>();
+		private static readonly ConcurrentDictionary<MemberInfo, Delegate> setters =
+				new ConcurrentDictionary<MemberInfo, Delegate>();
+
+		private static MemberInfo[] GetKeys(Type type)
+		{
+			MemberInfo[] memberInfos;
+			if (keys.TryGetValue(type, out memberInfos))
+				return memberInfos;
+			return keys.GetOrAdd(type, ttype =>
+			{
+				Dictionary<uint, MemberInfo> dict = new Dictionary<uint, MemberInfo>();
+				foreach (MemberInfo member in ttype.GetMembers(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
 				{
-					TypeCode code = Type.GetTypeCode(typeof(T));
-					if (code == TypeCode.Boolean)
+					if ((member.MemberType & (MemberTypes.Field | MemberTypes.Property)) != 0)
 					{
-						switch (Type.GetTypeCode(field.FieldType))
+						foreach (Attribute attribute in member.GetCustomAttributes(false))
 						{
-						case TypeCode.UInt64:
-						case TypeCode.Int64:
-							il.Emit(OpCodes.Ldc_I4_0);
-							il.Emit(OpCodes.Conv_I8);
-							break;
-						case TypeCode.SByte:
-						case TypeCode.Byte:
-						case TypeCode.Int16:
-						case TypeCode.UInt16:
-						case TypeCode.Int32:
-						case TypeCode.UInt32:
-							il.Emit(OpCodes.Ldc_I4_0);
-							break;
-						default:
-							throw new DataSet.TypeMismatchException();
+							KeyAttribute keyattr = attribute as KeyAttribute;
+							if (keyattr != null)
+							{
+								dict.Add(keyattr.Index, member);
+								break;
+							}
 						}
-						il.Emit(OpCodes.Ceq);
-						il.Emit(OpCodes.Ldc_I4_0);
-						il.Emit(OpCodes.Ceq);
-					}
-					else
-					{
-						OpCode op = code.ConvertFrom(Type.GetTypeCode(field.FieldType));
-						if (op == OpCodes.Throw)
-							throw new DataSet.TypeMismatchException();
-						if (op != OpCodes.Nop)
-							il.Emit(op);
 					}
 				}
-			}
-			il.Emit(OpCodes.Ret);
-			return (Func<object, T>)dm.CreateDelegate(typeof(Func<object, T>));
+				MemberInfo[] array = new MemberInfo[dict.Count];
+				foreach (var kv in dict)
+				{
+					array[kv.Key] = kv.Value;
+				}
+				return array;
+			});
 		}
+
+		private static Dictionary<string, MemberInfo> GetColumns(Type type)
+		{
+			Dictionary<string, MemberInfo> memberInfos;
+			if (columns.TryGetValue(type, out memberInfos))
+				return memberInfos;
+			return columns.GetOrAdd(type, ttype =>
+			{
+				Dictionary<string, MemberInfo> dict = new Dictionary<string, MemberInfo>();
+				foreach (MemberInfo member in ttype.GetMembers(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+				{
+					if ((member.MemberType & (MemberTypes.Field | MemberTypes.Property)) != 0)
+					{
+						foreach (Attribute attribute in member.GetCustomAttributes(false))
+						{
+							ColumnAttribute columnattr = attribute as ColumnAttribute;
+							if (columnattr != null)
+							{
+								dict.Add(columnattr.Auto ? member.Name : columnattr.Name, member);
+								break;
+							}
+						}
+					}
+				}
+				return dict;
+			});
+		}
+		#endregion
+
+		#region 创建访问器
+		private static Delegate CreateGetter<T>(FieldInfo field)
+		{
+			switch (Type.GetTypeCode(typeof(T)))
+			{
+			case TypeCode.Boolean:
+				if (typeof(FormatBoolean).IsAssignableFrom(field.FieldType))
+				{
+					Func<object, FormatBoolean> fn = FastAccessor.CreateGetter<FormatBoolean>(field);
+					Func<object, bool> ret = o => fn(o).Value;
+					return ret;
+				}
+				break;
+			case TypeCode.Int32:
+				if (typeof(FormatInteger).IsAssignableFrom(field.FieldType))
+				{
+					Func<object, FormatInteger> fn = FastAccessor.CreateGetter<FormatInteger>(field);
+					Func<object, int> ret = o => fn(o).Value;
+					return ret;
+				}
+				break;
+			case TypeCode.Int64:
+				if (typeof(FormatLong).IsAssignableFrom(field.FieldType))
+				{
+					Func<object, FormatLong> fn = FastAccessor.CreateGetter<FormatLong>(field);
+					Func<object, long> ret = o => fn(o).Value;
+					return ret;
+				}
+				break;
+			case TypeCode.Double:
+				if (typeof(FormatDouble).IsAssignableFrom(field.FieldType))
+				{
+					Func<object, FormatDouble> fn = FastAccessor.CreateGetter<FormatDouble>(field);
+					Func<object, double> ret = o => fn(o).Value;
+					return ret;
+				}
+				break;
+			case TypeCode.String:
+				if (typeof(FormatString).IsAssignableFrom(field.FieldType))
+				{
+					Func<object, FormatString> fn = FastAccessor.CreateGetter<FormatString>(field);
+					Func<object, string> ret = o => fn(o).Value;
+					return ret;
+				}
+				break;
+			default:
+				if (typeof(FormatBytes).IsAssignableFrom(field.FieldType))
+				{
+					Func<object, FormatBytes> fn = FastAccessor.CreateGetter<FormatBytes>(field);
+					Func<object, byte[]> ret = o => fn(o).Value;
+					return ret;
+				}
+				break;
+			}
+			return FastAccessor.CreateGetter<T>(field);
+		}
+
+		private static Delegate CreateGetter<T>(PropertyInfo property)
+		{
+			switch (Type.GetTypeCode(typeof(T)))
+			{
+			case TypeCode.Boolean:
+				if (typeof(FormatBoolean).IsAssignableFrom(property.PropertyType))
+				{
+					Func<object, FormatBoolean> fn = FastAccessor.CreateGetter<FormatBoolean>(property);
+					Func<object, bool> ret = o => fn(o).Value;
+					return ret;
+				}
+				break;
+			case TypeCode.Int32:
+				if (typeof(FormatInteger).IsAssignableFrom(property.PropertyType))
+				{
+					Func<object, FormatInteger> fn = FastAccessor.CreateGetter<FormatInteger>(property);
+					Func<object, int> ret = o => fn(o).Value;
+					return ret;
+				}
+				break;
+			case TypeCode.Int64:
+				if (typeof(FormatLong).IsAssignableFrom(property.PropertyType))
+				{
+					Func<object, FormatLong> fn = FastAccessor.CreateGetter<FormatLong>(property);
+					Func<object, long> ret = o => fn(o).Value;
+					return ret;
+				}
+				break;
+			case TypeCode.Double:
+				if (typeof(FormatDouble).IsAssignableFrom(property.PropertyType))
+				{
+					Func<object, FormatDouble> fn = FastAccessor.CreateGetter<FormatDouble>(property);
+					Func<object, double> ret = o => fn(o).Value;
+					return ret;
+				}
+				break;
+			case TypeCode.String:
+				if (typeof(FormatString).IsAssignableFrom(property.PropertyType))
+				{
+					Func<object, FormatString> fn = FastAccessor.CreateGetter<FormatString>(property);
+					Func<object, string> ret = o => fn(o).Value;
+					return ret;
+				}
+				break;
+			default:
+				if (typeof(FormatBytes).IsAssignableFrom(property.PropertyType))
+				{
+					Func<object, FormatBytes> fn = FastAccessor.CreateGetter<FormatBytes>(property);
+					Func<object, byte[]> ret = o => fn(o).Value;
+					return ret;
+				}
+				break;
+			}
+			return FastAccessor.CreateGetter<T>(property);
+		}
+
+		private static Delegate CreateSetter<T>(FieldInfo field)
+		{
+			switch (Type.GetTypeCode(typeof(T)))
+			{
+			case TypeCode.Boolean:
+				if (typeof(FormatBoolean).IsAssignableFrom(field.FieldType))
+				{
+					Func<object, FormatBoolean> fn = FastAccessor.CreateGetter<FormatBoolean>(field);
+					Action<object, bool> ret = (o, v) => { fn(o).Value = v; };
+					return ret;
+				}
+				break;
+			case TypeCode.Int32:
+				if (typeof(FormatInteger).IsAssignableFrom(field.FieldType))
+				{
+					Func<object, FormatInteger> fn = FastAccessor.CreateGetter<FormatInteger>(field);
+					Action<object, int> ret = (o, v) => { fn(o).Value = v; };
+					return ret;
+				}
+				break;
+			case TypeCode.Int64:
+				if (typeof(FormatLong).IsAssignableFrom(field.FieldType))
+				{
+					Func<object, FormatLong> fn = FastAccessor.CreateGetter<FormatLong>(field);
+					Action<object, long> ret = (o, v) => { fn(o).Value = v; };
+					return ret;
+				}
+				break;
+			case TypeCode.Double:
+				if (typeof(FormatDouble).IsAssignableFrom(field.FieldType))
+				{
+					Func<object, FormatDouble> fn = FastAccessor.CreateGetter<FormatDouble>(field);
+					Action<object, double> ret = (o, v) => { fn(o).Value = v; };
+					return ret;
+				}
+				break;
+			case TypeCode.String:
+				if (typeof(FormatString).IsAssignableFrom(field.FieldType))
+				{
+					Func<object, FormatString> fn = FastAccessor.CreateGetter<FormatString>(field);
+					Action<object, string> ret = (o, v) => { fn(o).Value = v; };
+					return ret;
+				}
+				break;
+			default:
+				if (typeof(FormatBytes).IsAssignableFrom(field.FieldType))
+				{
+					Func<object, FormatBytes> fn = FastAccessor.CreateGetter<FormatBytes>(field);
+					Action<object, byte[]> ret = (o, v) => { fn(o).Value = v; };
+					return ret;
+				}
+				break;
+			}
+			return FastAccessor.CreateSetter<T>(field);
+		}
+
+		private static Delegate CreateSetter<T>(PropertyInfo property)
+		{
+			switch (Type.GetTypeCode(typeof(T)))
+			{
+			case TypeCode.Boolean:
+				if (typeof(FormatBoolean).IsAssignableFrom(property.PropertyType))
+				{
+					Func<object, FormatBoolean> fn = FastAccessor.CreateGetter<FormatBoolean>(property);
+					Action<object, bool> ret = (o, v) => { fn(o).Value = v; };
+					return ret;
+				}
+				break;
+			case TypeCode.Int32:
+				if (typeof(FormatInteger).IsAssignableFrom(property.PropertyType))
+				{
+					Func<object, FormatInteger> fn = FastAccessor.CreateGetter<FormatInteger>(property);
+					Action<object, int> ret = (o, v) => { fn(o).Value = v; };
+					return ret;
+				}
+				break;
+			case TypeCode.Int64:
+				if (typeof(FormatLong).IsAssignableFrom(property.PropertyType))
+				{
+					Func<object, FormatLong> fn = FastAccessor.CreateGetter<FormatLong>(property);
+					Action<object, long> ret = (o, v) => { fn(o).Value = v; };
+					return ret;
+				}
+				break;
+			case TypeCode.Double:
+				if (typeof(FormatDouble).IsAssignableFrom(property.PropertyType))
+				{
+					Func<object, FormatDouble> fn = FastAccessor.CreateGetter<FormatDouble>(property);
+					Action<object, double> ret = (o, v) => { fn(o).Value = v; };
+					return ret;
+				}
+				break;
+			case TypeCode.String:
+				if (typeof(FormatString).IsAssignableFrom(property.PropertyType))
+				{
+					Func<object, FormatString> fn = FastAccessor.CreateGetter<FormatString>(property);
+					Action<object, string> ret = (o, v) => { fn(o).Value = v; };
+					return ret;
+				}
+				break;
+			default:
+				if (typeof(FormatBytes).IsAssignableFrom(property.PropertyType))
+				{
+					Func<object, FormatBytes> fn = FastAccessor.CreateGetter<FormatBytes>(property);
+					Action<object, byte[]> ret = (o, v) => { fn(o).Value = v; };
+					return ret;
+				}
+				break;
+			}
+			return FastAccessor.CreateSetter<T>(property);
+		}
+		#endregion
 	}
 }

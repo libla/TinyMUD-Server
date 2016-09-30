@@ -53,6 +53,7 @@
     <Compile Include="System\Buffer.cs" />
     <Compile Include="System\Config.cs" />
     <Compile Include="System\Console.cs" />
+    <Compile Include="System\FastAccessor.cs" />
     <Compile Include="System\Helper.cs" />
     <Compile Include="System\Log.cs" />
     <Compile Include="System\Loop.cs" />
