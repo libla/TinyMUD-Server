@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace TinyMUD
 {
@@ -116,7 +114,7 @@ namespace TinyMUD
 
 		public abstract class Selector : IDisposable
 		{
-			public abstract Task Select(Define define, Key key, Column column);
+			public abstract Task<bool> Select(Define define, Key key, Column column);
 			public abstract void Select(Define define, Key key);
 			public abstract Task<Reader> Execute();
 			public abstract Task<Reader> Scan(Define define);
@@ -128,9 +126,14 @@ namespace TinyMUD
 			}
 		}
 
-		public abstract class Reader
+		public abstract class Reader : IDisposable
 		{
 			public abstract Task<bool> Read(Key key, Column column);
+			public abstract void Close();
+			public void Dispose()
+			{
+				Close();
+			}
 		}
 	}
 }
