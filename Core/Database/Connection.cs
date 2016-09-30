@@ -6,7 +6,7 @@ namespace TinyMUD
 {
 	public abstract class Connection : IDisposable
 	{
-		public async Task VerifyTable(params DataEntity.Define[] defines)
+		public async Task VerifyTable(params DataSet.Define[] defines)
 		{
 			for (int i = 0; i < defines.Length; ++i)
 			{
@@ -19,10 +19,10 @@ namespace TinyMUD
 			Close();
 		}
 
-		public abstract DataEntity.Writer CreateWriter();
-		public abstract DataEntity.Selector CreateSelector();
+		public abstract DataSet.Writer CreateWriter();
+		public abstract DataSet.Selector CreateSelector();
 
-		protected abstract Task VerifyTable(DataEntity.Define define);
+		protected abstract Task VerifyTable(DataSet.Define define);
 		public abstract void Close();
 	}
 }

@@ -39,7 +39,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Database\Connection.cs" />
-    <Compile Include="Database\DataEntity.cs" />
+    <Compile Include="Database\DataSet.cs" />
     <Compile Include="Network\Request.cs" />
     <Compile Include="Network\Server.cs" />
     <Compile Include="Network\Session.cs" />
