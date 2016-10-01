@@ -88,42 +88,67 @@ namespace TinyMUD
 		#endregion
 
 		#region 实现DataSet.Key接口
-		public class Key : DataSet.Key
+		public class Key<T> : DataSet.Key
 		{
-			private Func<object, T> Getter<T>(int index)
+			public static readonly MemberInfo[] Members;
+
+			static Key()
 			{
-				MemberInfo[] memberInfos = GetKeys(GetType());
-				Delegate getter;
-				if (!getters.TryGetValue(memberInfos[index], out getter))
+				Dictionary<uint, MemberInfo> dict = new Dictionary<uint, MemberInfo>();
+				foreach (MemberInfo member in typeof(T).GetMembers(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
 				{
-					getter = getters.GetOrAdd(memberInfos[index], member =>
+					if ((member.MemberType & (MemberTypes.Field | MemberTypes.Property)) != 0)
 					{
-						if (member.MemberType == MemberTypes.Field)
-							return CreateGetter<T>(member as FieldInfo);
-						if (member.MemberType == MemberTypes.Property)
-							return CreateGetter<T>(member as PropertyInfo);
-						throw new MissingFieldException(member.DeclaringType.FullName, member.Name);
-					});
+						foreach (Attribute attribute in member.GetCustomAttributes(false))
+						{
+							KeyAttribute keyattr = attribute as KeyAttribute;
+							if (keyattr != null)
+							{
+								dict.Add(keyattr.Index, member);
+								break;
+							}
+						}
+					}
 				}
-				return (Func<object, T>)getter;
+				Members = new MemberInfo[dict.Count];
+				foreach (var kv in dict)
+				{
+					Members[kv.Key] = kv.Value;
+				}
 			}
 
-			private Action<object, T> Setter<T>(int index)
+			private Func<object, V> Getter<V>(int index)
 			{
-				MemberInfo[] memberInfos = GetKeys(GetType());
-				Delegate setter;
-				if (!setters.TryGetValue(memberInfos[index], out setter))
+				Delegate getter;
+				if (!getters.TryGetValue(Members[index], out getter))
 				{
-					setter = setters.GetOrAdd(memberInfos[index], member =>
+					getter = getters.GetOrAdd(Members[index], member =>
 					{
 						if (member.MemberType == MemberTypes.Field)
-							return CreateSetter<T>(member as FieldInfo);
+							return CreateGetter<V>(member as FieldInfo);
 						if (member.MemberType == MemberTypes.Property)
-							return CreateSetter<T>(member as PropertyInfo);
+							return CreateGetter<V>(member as PropertyInfo);
 						throw new MissingFieldException(member.DeclaringType.FullName, member.Name);
 					});
 				}
-				return (Action<object, T>)setter;
+				return (Func<object, V>)getter;
+			}
+
+			private Action<object, V> Setter<V>(int index)
+			{
+				Delegate setter;
+				if (!setters.TryGetValue(Members[index], out setter))
+				{
+					setter = setters.GetOrAdd(Members[index], member =>
+					{
+						if (member.MemberType == MemberTypes.Field)
+							return CreateSetter<V>(member as FieldInfo);
+						if (member.MemberType == MemberTypes.Property)
+							return CreateSetter<V>(member as PropertyInfo);
+						throw new MissingFieldException(member.DeclaringType.FullName, member.Name);
+					});
+				}
+				return (Action<object, V>)setter;
 			}
 
 			public bool Read(int index, ref bool b)
@@ -285,42 +310,62 @@ namespace TinyMUD
 		#endregion
 
 		#region 实现DataSet.Column接口
-		public class Column : DataSet.Column
+		public class Column<T> : DataSet.Column
 		{
-			private Func<object, T> Getter<T>(string name)
+			public static readonly Dictionary<string, MemberInfo> Members;
+
+			static Column()
 			{
-				Dictionary<string, MemberInfo> memberInfos = GetColumns(GetType());
-				Delegate getter;
-				if (!getters.TryGetValue(memberInfos[name], out getter))
+				Members = new Dictionary<string, MemberInfo>();
+				foreach (MemberInfo member in typeof(T).GetMembers(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
 				{
-					getter = getters.GetOrAdd(memberInfos[name], member =>
+					if ((member.MemberType & (MemberTypes.Field | MemberTypes.Property)) != 0)
 					{
-						if (member.MemberType == MemberTypes.Field)
-							return CreateGetter<T>(member as FieldInfo);
-						if (member.MemberType == MemberTypes.Property)
-							return CreateGetter<T>(member as PropertyInfo);
-						throw new MissingFieldException(member.DeclaringType.FullName, member.Name);
-					});
+						foreach (Attribute attribute in member.GetCustomAttributes(false))
+						{
+							ColumnAttribute columnattr = attribute as ColumnAttribute;
+							if (columnattr != null)
+							{
+								Members.Add(columnattr.Auto ? member.Name : columnattr.Name, member);
+								break;
+							}
+						}
+					}
 				}
-				return (Func<object, T>)getter;
 			}
 
-			private Action<object, T> Setter<T>(string name)
+			private Func<object, V> Getter<V>(string name)
 			{
-				Dictionary<string, MemberInfo> memberInfos = GetColumns(GetType());
-				Delegate setter;
-				if (!setters.TryGetValue(memberInfos[name], out setter))
+				Delegate getter;
+				if (!getters.TryGetValue(Members[name], out getter))
 				{
-					setter = setters.GetOrAdd(memberInfos[name], member =>
+					getter = getters.GetOrAdd(Members[name], member =>
 					{
 						if (member.MemberType == MemberTypes.Field)
-							return CreateSetter<T>(member as FieldInfo);
+							return CreateGetter<V>(member as FieldInfo);
 						if (member.MemberType == MemberTypes.Property)
-							return CreateSetter<T>(member as PropertyInfo);
+							return CreateGetter<V>(member as PropertyInfo);
 						throw new MissingFieldException(member.DeclaringType.FullName, member.Name);
 					});
 				}
-				return (Action<object, T>)setter;
+				return (Func<object, V>)getter;
+			}
+
+			private Action<object, V> Setter<V>(string name)
+			{
+				Delegate setter;
+				if (!setters.TryGetValue(Members[name], out setter))
+				{
+					setter = setters.GetOrAdd(Members[name], member =>
+					{
+						if (member.MemberType == MemberTypes.Field)
+							return CreateSetter<V>(member as FieldInfo);
+						if (member.MemberType == MemberTypes.Property)
+							return CreateSetter<V>(member as PropertyInfo);
+						throw new MissingFieldException(member.DeclaringType.FullName, member.Name);
+					});
+				}
+				return (Action<object, V>)setter;
 			}
 
 			public bool Read(string field, ref bool b)
@@ -395,7 +440,7 @@ namespace TinyMUD
 					bytes = Getter<byte[]>(field)(this);
 					return true;
 				}
-				catch (Exception e)
+				catch (Exception)
 				{
 					return false;
 				}
@@ -482,8 +527,8 @@ namespace TinyMUD
 		#endregion
 
 		public static DataSet.Define GetDefine<TKey, TColumn>(string name)
-			where TKey : Key
-			where TColumn : Column
+			where TKey : Key<TKey>
+			where TColumn : Column<TColumn>
 		{
 			DefineIndex index = new DefineIndex
 			{
@@ -498,7 +543,7 @@ namespace TinyMUD
 			{
 				DataSet.Define def = new DataSet.Define(idx.Name);
 				Dictionary<uint, DataSet.Type> keytypes = new Dictionary<uint, DataSet.Type>();
-				foreach (MemberInfo member in GetKeys(idx.Key))
+				foreach (MemberInfo member in Key<TKey>.Members)
 				{
 					foreach (Attribute attribute in member.GetCustomAttributes(false))
 					{
@@ -521,7 +566,7 @@ namespace TinyMUD
 					}
 				}
 				Dictionary<string, DataSet.Type> columntypes = new Dictionary<string, DataSet.Type>();
-				foreach (MemberInfo member in GetColumns(idx.Column).Values)
+				foreach (MemberInfo member in Column<TColumn>.Members.Values)
 				{
 					foreach (Attribute attribute in member.GetCustomAttributes(false))
 					{
@@ -620,77 +665,12 @@ namespace TinyMUD
 		}
 		#endregion
 
-		#region 遍历Type的字段属性
-		private static readonly ConcurrentDictionary<Type, MemberInfo[]> keys =
-				new ConcurrentDictionary<Type, MemberInfo[]>();
-		private static readonly ConcurrentDictionary<Type, Dictionary<string, MemberInfo>> columns =
-				new ConcurrentDictionary<Type, Dictionary<string, MemberInfo>>();
+		#region 创建访问器
 		private static readonly ConcurrentDictionary<MemberInfo, Delegate> getters =
 				new ConcurrentDictionary<MemberInfo, Delegate>();
 		private static readonly ConcurrentDictionary<MemberInfo, Delegate> setters =
 				new ConcurrentDictionary<MemberInfo, Delegate>();
 
-		private static MemberInfo[] GetKeys(Type type)
-		{
-			MemberInfo[] memberInfos;
-			if (keys.TryGetValue(type, out memberInfos))
-				return memberInfos;
-			return keys.GetOrAdd(type, ttype =>
-			{
-				Dictionary<uint, MemberInfo> dict = new Dictionary<uint, MemberInfo>();
-				foreach (MemberInfo member in ttype.GetMembers(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
-				{
-					if ((member.MemberType & (MemberTypes.Field | MemberTypes.Property)) != 0)
-					{
-						foreach (Attribute attribute in member.GetCustomAttributes(false))
-						{
-							KeyAttribute keyattr = attribute as KeyAttribute;
-							if (keyattr != null)
-							{
-								dict.Add(keyattr.Index, member);
-								break;
-							}
-						}
-					}
-				}
-				MemberInfo[] array = new MemberInfo[dict.Count];
-				foreach (var kv in dict)
-				{
-					array[kv.Key] = kv.Value;
-				}
-				return array;
-			});
-		}
-
-		private static Dictionary<string, MemberInfo> GetColumns(Type type)
-		{
-			Dictionary<string, MemberInfo> memberInfos;
-			if (columns.TryGetValue(type, out memberInfos))
-				return memberInfos;
-			return columns.GetOrAdd(type, ttype =>
-			{
-				Dictionary<string, MemberInfo> dict = new Dictionary<string, MemberInfo>();
-				foreach (MemberInfo member in ttype.GetMembers(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
-				{
-					if ((member.MemberType & (MemberTypes.Field | MemberTypes.Property)) != 0)
-					{
-						foreach (Attribute attribute in member.GetCustomAttributes(false))
-						{
-							ColumnAttribute columnattr = attribute as ColumnAttribute;
-							if (columnattr != null)
-							{
-								dict.Add(columnattr.Auto ? member.Name : columnattr.Name, member);
-								break;
-							}
-						}
-					}
-				}
-				return dict;
-			});
-		}
-		#endregion
-
-		#region 创建访问器
 		private static Delegate CreateGetter<T>(FieldInfo field)
 		{
 			switch (Type.GetTypeCode(typeof(T)))
